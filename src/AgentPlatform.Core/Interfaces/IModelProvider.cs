@@ -14,6 +14,7 @@ public class ChatCompletionRequest
     public List<ChatMessage> Messages { get; set; } = new();
     public int MaxTokens { get; set; } = 4096;
     public float Temperature { get; set; } = 0.7f;
+    public float? TopP { get; set; }
 }
 
 public class ChatMessage

@@ -1,0 +1,40 @@
+services:
+  api:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0-preview
+    container_name: agent-platform-api
+    build:
+      context: .
+      dockerfile: src/AgentPlatform.Web/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Jwt__Key=SuperSecretKeyForDevelopment_DoNotUseInProduction!
+      - Jwt__Issuer=AgentPlatform
+      - Jwt__Audience=AgentPlatformAdmin
+    volumes:
+      - api-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: nginx:alpine
+    container_name: agent-platform-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend/admin/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  api-data:

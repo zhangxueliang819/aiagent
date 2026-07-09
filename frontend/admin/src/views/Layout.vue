@@ -38,8 +38,15 @@
       </el-menu>
     </el-aside>
     <el-container>
-      <el-header style="background: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; padding: 0 20px">
+      <el-header style="background: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; justify-content: space-between; padding: 0 20px">
         <h3 style="margin: 0">{{ route.meta.title }}</h3>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="font-size: 14px; color: #666">
+            <el-icon><User /></el-icon>
+            {{ authStore.displayName }}
+          </span>
+          <el-button size="small" type="danger" plain @click="handleLogout">退出登录</el-button>
+        </div>
       </el-header>
       <el-main style="background: #f0f2f5">
         <router-view />
@@ -49,6 +56,20 @@
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { User } from '@element-plus/icons-vue'
+import { useAuthStore } from '../stores/auth'
+import { ElMessageBox } from 'element-plus'
+
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
+    authStore.logout()
+    router.push('/login')
+  } catch { /* cancelled */ }
+}
 </script>

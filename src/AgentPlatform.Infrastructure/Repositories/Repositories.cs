@@ -98,6 +98,11 @@ public class ModelProviderRepository : IModelProviderRepository
         _db.ModelEndpoints.Remove(endpoint);
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task<List<ModelEndpoint>> GetEnabledEndpointsByProviderAsync(Guid providerId, CancellationToken ct = default)
+        => await _db.ModelEndpoints.Include(e => e.ModelProvider)
+            .Where(e => e.ModelProviderId == providerId && e.IsEnabled)
+            .ToListAsync(ct);
 }
 
 public class SkillRepository : ISkillRepository
@@ -162,6 +167,17 @@ public class SessionRepository : ISessionRepository
         await _db.SaveChangesAsync(ct);
         return conversation;
     }
+
+    public async Task UpdateAsync(Session session, CancellationToken ct = default)
+    {
+        _db.Sessions.Update(session);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<List<Session>> GetActiveSessionsOlderThanAsync(DateTime threshold, CancellationToken ct = default)
+        => await _db.Sessions
+            .Where(s => s.Status == Core.Entities.SessionStatus.Active && s.UpdatedAt < threshold)
+            .ToListAsync(ct);
 }
 
 public class UsageRepository : IUsageRepository
@@ -172,6 +188,12 @@ public class UsageRepository : IUsageRepository
 
     public async Task<List<UsageRecord>> GetByUserIdAsync(string userId, DateTime from, DateTime to, CancellationToken ct = default)
         => await _db.UsageRecords.Where(r => r.UserId == userId && r.CreatedAt >= from && r.CreatedAt <= to).OrderByDescending(r => r.CreatedAt).ToListAsync(ct);
+
+    public async Task<List<UsageRecord>> GetByAgentIdAsync(Guid agentId, DateTime from, DateTime to, CancellationToken ct = default)
+        => await _db.UsageRecords.Where(r => r.AgentId == agentId && r.CreatedAt >= from && r.CreatedAt <= to).OrderByDescending(r => r.CreatedAt).ToListAsync(ct);
+
+    public async Task<List<UsageRecord>> GetAllAsync(DateTime from, DateTime to, CancellationToken ct = default)
+        => await _db.UsageRecords.Where(r => r.CreatedAt >= from && r.CreatedAt <= to).OrderByDescending(r => r.CreatedAt).ToListAsync(ct);
 
     public async Task<UsageRecord> AddAsync(UsageRecord record, CancellationToken ct = default)
     {
@@ -268,6 +290,29 @@ public class AgentMcpEndpointRepository : IAgentMcpEndpointRepository
     }
 }
 
+public class AgentVersionRepository : IAgentVersionRepository
+{
+    private readonly AgentPlatformDbContext _db;
+
+    public AgentVersionRepository(AgentPlatformDbContext db) => _db = db;
+
+    public async Task<List<AgentVersion>> GetByAgentIdAsync(Guid agentId, CancellationToken ct = default)
+        => await _db.AgentVersions.Where(v => v.AgentId == agentId).OrderByDescending(v => v.VersionNumber).ToListAsync(ct);
+
+    public async Task<AgentVersion> AddAsync(AgentVersion version, CancellationToken ct = default)
+    {
+        _db.AgentVersions.Add(version);
+        await _db.SaveChangesAsync(ct);
+        return version;
+    }
+
+    public async Task<int> GetNextVersionNumberAsync(Guid agentId, CancellationToken ct = default)
+    {
+        var max = await _db.AgentVersions.Where(v => v.AgentId == agentId).MaxAsync(v => (int?)v.VersionNumber, ct);
+        return (max ?? 0) + 1;
+    }
+}
+
 public class AgentSkillRepository : IAgentSkillRepository
 {
     private readonly AgentPlatformDbContext _db;
@@ -290,6 +335,63 @@ public class AgentSkillRepository : IAgentSkillRepository
         if (b is not null)
         {
             _db.AgentSkills.Remove(b);
+            await _db.SaveChangesAsync(ct);
+        }
+    }
+}
+
+public class AuditLogRepository : IAuditLogRepository
+{
+    private readonly AgentPlatformDbContext _db;
+
+    public AuditLogRepository(AgentPlatformDbContext db) => _db = db;
+
+    public async Task<List<AuditLog>> GetAllAsync(DateTime from, DateTime to, CancellationToken ct = default)
+        => await _db.AuditLogs.Where(l => l.CreatedAt >= from && l.CreatedAt <= to).OrderByDescending(l => l.CreatedAt).ToListAsync(ct);
+
+    public async Task<AuditLog> AddAsync(AuditLog log, CancellationToken ct = default)
+    {
+        _db.AuditLogs.Add(log);
+        await _db.SaveChangesAsync(ct);
+        return log;
+    }
+}
+
+public class UserRepository : IUserRepository
+{
+    private readonly AgentPlatformDbContext _db;
+
+    public UserRepository(AgentPlatformDbContext db) => _db = db;
+
+    public async Task<List<User>> GetAllAsync(CancellationToken ct = default)
+        => await _db.Users.ToListAsync(ct);
+
+    public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => await _db.Users.FindAsync([id], ct);
+
+    public async Task<User?> GetByUsernameAsync(string username, CancellationToken ct = default)
+        => await _db.Users.FirstOrDefaultAsync(u => u.Username == username, ct);
+
+    public async Task<User> AddAsync(User user, CancellationToken ct = default)
+    {
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
+
+    public async Task<User> UpdateAsync(User user, CancellationToken ct = default)
+    {
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var u = await _db.Users.FindAsync([id], ct);
+        if (u is not null)
+        {
+            _db.Users.Remove(u);
             await _db.SaveChangesAsync(ct);
         }
     }

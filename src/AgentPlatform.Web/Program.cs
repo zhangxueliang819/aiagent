@@ -5,12 +5,17 @@ using AgentPlatform.Infrastructure.Repositories;
 using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.AgentEngine.Runtime;
+using AgentPlatform.AgentEngine.Services;
 using AgentPlatform.ModelProviders.Mcp;
 using AgentPlatform.ModelProviders.Simulated;
 using AgentPlatform.Web.Controllers;
 using AgentPlatform.Web.Hubs;
+using AgentPlatform.Web.Middleware;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Text;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -37,6 +42,9 @@ try
     builder.Services.AddScoped<IMcpToolRepository, McpToolRepository>();
     builder.Services.AddScoped<IAgentMcpEndpointRepository, AgentMcpEndpointRepository>();
     builder.Services.AddScoped<IAgentSkillRepository, AgentSkillRepository>();
+    builder.Services.AddScoped<IAgentVersionRepository, AgentVersionRepository>();
+    builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
 
     // Services
     builder.Services.AddScoped<AgentService>();
@@ -45,6 +53,12 @@ try
     builder.Services.AddScoped<SkillService>();
     builder.Services.AddScoped<SessionService>();
     builder.Services.AddScoped<UsageService>();
+    builder.Services.AddScoped<AuditService>();
+    builder.Services.AddScoped<UserService>();
+
+    // Rate Limiting & Metrics
+    builder.Services.AddSingleton<RateLimiter>();
+    builder.Services.AddSingleton<ModelMetricsCollector>();
 
     // Agent Engine - Skill Executors
     builder.Services.AddSingleton<ISkillExecutor, ToolSkillExecutor>();
@@ -59,6 +73,9 @@ try
     builder.Services.AddSingleton<SkillDispatcher>();
     builder.Services.AddSingleton<FunctionCallHandler>();
     builder.Services.AddSingleton<AgentRuntime>();
+
+    // Background Services
+    builder.Services.AddHostedService<SessionCleanupService>();
 
     // MCP Client
     builder.Services.AddHttpClient<McpClient>();
@@ -86,6 +103,42 @@ try
         });
     });
 
+    // JWT Authentication
+    var jwtSection = builder.Configuration.GetSection("Jwt");
+    var jwtKey = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(jwtKey)
+        };
+        // SignalR 支持从 QueryString 读取 Token
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
+    builder.Services.AddAuthorization();
+
     // SignalR
     builder.Services.AddSignalR();
     builder.Services.AddSingleton<ChatEventBroadcaster>();
@@ -97,6 +150,15 @@ try
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Agent Platform API v1"));
     app.UseCors();
+
+    // Authentication & Authorization
+    app.UseAuthentication();
+
+    // API Key 认证中间件（在 JWT 之后、Authorization 之前检查）
+    app.UseMiddleware<ApiKeyAuthMiddleware>();
+
+    app.UseAuthorization();
+
     app.MapControllers();
     app.MapHub<ChatHub>("/hubs/chat");
 

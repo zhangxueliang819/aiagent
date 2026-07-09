@@ -6,13 +6,19 @@ using Microsoft.Extensions.Logging;
 namespace AgentPlatform.ModelProviders.Mcp;
 
 /// <summary>
-/// MCP Client：连接外部 MCP 端点（SSE 协议），发现工具列表并调用工具
-/// 当前为模拟实现，展示完整的接口契约
+/// MCP Client：通过 JSON-RPC 2.0 协议连接外部 MCP 端点
+/// 支持 tools/list 和 tools/call 方法
 /// </summary>
 public class McpClient
 {
     private readonly ILogger<McpClient> _logger;
     private readonly HttpClient _httpClient;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
 
     public McpClient(ILogger<McpClient> logger, HttpClient httpClient)
     {
@@ -21,88 +27,52 @@ public class McpClient
     }
 
     /// <summary>
-    /// 连接 MCP 端点并发现其提供的工具列表
+    /// 发现 MCP 端点提供的工具列表（JSON-RPC 2.0 tools/list）
     /// </summary>
     public async Task<List<McpTool>> DiscoverToolsAsync(McpEndpoint endpoint, CancellationToken ct)
     {
         _logger.LogInformation("Discovering tools from MCP endpoint: {Name} ({Url})",
             endpoint.Name, endpoint.EndpointUrl);
 
+        if (string.IsNullOrWhiteSpace(endpoint.EndpointUrl))
+        {
+            _logger.LogWarning("MCP endpoint {Name} has no URL configured, returning empty tools", endpoint.Name);
+            return [];
+        }
+
         try
         {
-            // 真实实现：向 MCP 端点发送 tools/list 请求
-            // var request = new { jsonrpc = "2.0", method = "tools/list", id = 1 };
-            // var response = await _httpClient.PostAsync(endpoint.EndpointUrl, new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json"), ct);
-            // var tools = ParseToolList(await response.Content.ReadAsStringAsync(ct));
-
-            // 模拟：返回预置工具列表
-            var simulatedTools = new List<McpTool>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    McpEndpointId = endpoint.Id,
-                    ToolName = $"{endpoint.Name}_search",
-                    Description = "Search documents in knowledge base",
-                    InputSchema = """{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}""",
-                    CachedAt = DateTime.UtcNow
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    McpEndpointId = endpoint.Id,
-                    ToolName = $"{endpoint.Name}_query",
-                    Description = "Query database with SQL",
-                    InputSchema = """{"type":"object","properties":{"sql":{"type":"string"}},"required":["sql"]}""",
-                    CachedAt = DateTime.UtcNow
-                }
-            };
-
-            _logger.LogInformation("Discovered {Count} tools from MCP endpoint {Name}",
-                simulatedTools.Count, endpoint.Name);
-
-            return simulatedTools;
+            var request = new JsonRpcRequest { Method = "tools/list", Id = 1 };
+            var responseJson = await SendJsonRpcAsync(endpoint, request, ct);
+            var tools = ParseToolListResponse(responseJson, endpoint.Id);
+            _logger.LogInformation("Discovered {Count} tools from {Name}", tools.Count, endpoint.Name);
+            return tools;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to discover tools from MCP endpoint {Name}", endpoint.Name);
-            return new List<McpTool>();
+            _logger.LogError(ex, "Failed to discover tools from MCP endpoint {Name}, falling back to cached", endpoint.Name);
+            return [];
         }
     }
 
     /// <summary>
-    /// 调用 MCP 端点上的指定工具
+    /// 调用 MCP 端点上的指定工具（JSON-RPC 2.0 tools/call）
     /// </summary>
     public async Task<McpToolResult> InvokeToolAsync(McpTool tool, Dictionary<string, object?> arguments, CancellationToken ct)
     {
-        _logger.LogInformation("Invoking MCP tool: {ToolName} on endpoint {EndpointId}",
-            tool.ToolName, tool.McpEndpointId);
+        _logger.LogInformation("Invoking MCP tool: {ToolName}", tool.ToolName);
 
         try
         {
-            // 真实实现：向 MCP 端点发送 tools/call 请求
-            // var request = new
-            // {
-            //     jsonrpc = "2.0",
-            //     method = "tools/call",
-            //     @params = new { name = tool.ToolName, arguments },
-            //     id = 2
-            // };
-            // var response = await _httpClient.PostAsync(endpointUrl, ...);
-
-            // 模拟执行结果
-            return new McpToolResult
+            var request = new JsonRpcRequest
             {
-                Success = true,
-                ToolName = tool.ToolName,
-                Content = JsonSerializer.Serialize(new
-                {
-                    status = "simulated",
-                    tool = tool.ToolName,
-                    args_received = arguments.Count,
-                    result = $"MCP tool '{tool.ToolName}' executed successfully (simulated)"
-                })
+                Method = "tools/call",
+                Id = 2,
+                Params = new { name = tool.ToolName, arguments }
             };
+
+            var responseJson = await SendJsonRpcAsync(tool.McpEndpoint!, request, ct);
+            return ParseToolCallResponse(responseJson, tool.ToolName);
         }
         catch (Exception ex)
         {
@@ -110,6 +80,106 @@ public class McpClient
             return new McpToolResult { Success = false, ToolName = tool.ToolName, Content = ex.Message };
         }
     }
+
+    private async Task<string> SendJsonRpcAsync(McpEndpoint endpoint, JsonRpcRequest request, CancellationToken ct)
+    {
+        // 解析 AuthConfig
+        var authConfig = string.IsNullOrWhiteSpace(endpoint.AuthConfig)
+            ? new Dictionary<string, string>()
+            : JsonSerializer.Deserialize<Dictionary<string, string>>(endpoint.AuthConfig) ?? [];
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint.EndpointUrl)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(request, JsonOptions),
+                Encoding.UTF8,
+                "application/json")
+        };
+
+        // 处理认证
+        if (authConfig.TryGetValue("type", out var authType))
+        {
+            switch (authType.ToLower())
+            {
+                case "bearer" when authConfig.TryGetValue("token", out var bearerToken):
+                    httpRequest.Headers.Authorization = new("Bearer", bearerToken);
+                    break;
+                case "api_key" when authConfig.TryGetValue("key", out var apiKey):
+                    httpRequest.Headers.Add("X-API-Key", apiKey);
+                    break;
+            }
+        }
+
+        using var response = await _httpClient.SendAsync(httpRequest, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(ct);
+    }
+
+    private static List<McpTool> ParseToolListResponse(string json, Guid endpointId)
+    {
+        var tools = new List<McpTool>();
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        // JSON-RPC 2.0: {"jsonrpc":"2.0","result":{"tools":[...]},"id":1}
+        if (root.TryGetProperty("result", out var result) && result.TryGetProperty("tools", out var toolArray))
+        {
+            foreach (var toolElem in toolArray.EnumerateArray())
+            {
+                tools.Add(new McpTool
+                {
+                    Id = Guid.NewGuid(),
+                    McpEndpointId = endpointId,
+                    ToolName = toolElem.GetProperty("name").GetString() ?? "unknown",
+                    Description = toolElem.TryGetProperty("description", out var desc) ? desc.GetString() ?? "" : "",
+                    InputSchema = toolElem.TryGetProperty("inputSchema", out var schema) ? schema.GetRawText() : "{}",
+                    IsEnabled = true,
+                    CachedAt = DateTime.UtcNow
+                });
+            }
+        }
+        return tools;
+    }
+
+    private static McpToolResult ParseToolCallResponse(string json, string toolName)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("error", out var error))
+        {
+            var msg = error.TryGetProperty("message", out var m) ? m.GetString() ?? "Unknown error" : "Unknown error";
+            return new McpToolResult { Success = false, ToolName = toolName, Content = msg };
+        }
+
+        var content = "";
+        if (root.TryGetProperty("result", out var result))
+        {
+            if (result.TryGetProperty("content", out var contentArray) && contentArray.GetArrayLength() > 0)
+            {
+                // MCP 标准: content 是数组，每项有 type 和 text
+                foreach (var item in contentArray.EnumerateArray())
+                {
+                    if (item.TryGetProperty("text", out var text))
+                        content += text.GetString();
+                }
+            }
+            else
+            {
+                content = result.GetRawText();
+            }
+        }
+
+        return new McpToolResult { Success = true, ToolName = toolName, Content = content };
+    }
+}
+
+internal class JsonRpcRequest
+{
+    public string Jsonrpc { get; set; } = "2.0";
+    public string Method { get; set; } = string.Empty;
+    public object? Params { get; set; }
+    public int Id { get; set; }
 }
 
 public class McpToolResult

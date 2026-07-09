@@ -20,6 +20,9 @@ public class AgentPlatformDbContext : DbContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<AgentVersion> AgentVersions => Set<AgentVersion>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -101,6 +104,27 @@ public class AgentPlatformDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.KeyHash).IsUnique();
+        });
+
+        modelBuilder.Entity<AgentVersion>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.AgentId, x.VersionNumber }).IsUnique();
+            e.Property(x => x.SnapshotJson).HasColumnType("nvarchar(max)");
+        });
+
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.EntityType);
+        });
+
+        modelBuilder.Entity<User>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Username).IsUnique();
         });
 
         // Seed default data

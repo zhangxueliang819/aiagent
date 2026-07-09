@@ -91,8 +91,9 @@ public class AgentRuntime
             {
                 ModelId = agent.ModelId,
                 Messages = messages,
-                MaxTokens = 4096,
-                Temperature = 0.7f
+                MaxTokens = agent.MaxTokens ?? 4096,
+                Temperature = (float)(agent.Temperature ?? 0.7),
+                TopP = agent.TopP is not null ? (float)agent.TopP : null
             };
 
             var response = await llm.CompleteAsync(request, ct);

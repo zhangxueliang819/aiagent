@@ -9,8 +9,15 @@ namespace AgentPlatform.Web.Controllers;
 public class ModelsController : ControllerBase
 {
     private readonly ModelProviderService _service;
+    private readonly ModelRouter _router;
+    private readonly ModelMetricsCollector _metrics;
 
-    public ModelsController(ModelProviderService service) => _service = service;
+    public ModelsController(ModelProviderService service, ModelRouter router, ModelMetricsCollector metrics)
+    {
+        _service = service;
+        _router = router;
+        _metrics = metrics;
+    }
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<ModelProviderDto>>>> GetAll(CancellationToken ct)
@@ -67,5 +74,26 @@ public class ModelsController : ControllerBase
     {
         await _service.DeleteEndpointAsync(endpointId, ct);
         return Ok(new ApiResponse<object>(true, "Deleted", null));
+    }
+
+    // ─── Metrics ────────────────────────────────────────────────
+
+    /// <summary>获取所有模型端点的性能指标</summary>
+    [HttpGet("metrics")]
+    public ActionResult<ApiResponse<List<ModelMetricsDto>>> GetMetrics()
+    {
+        var allMetrics = _metrics.GetAllMetrics();
+        var dtos = allMetrics.Select(m => new ModelMetricsDto(
+            m.EndpointId.ToString(), "", m.ActiveRequests, m.TotalRequests,
+            m.ErrorCount, m.AvgLatencyMs, false)).ToList();
+        return Ok(new ApiResponse<List<ModelMetricsDto>>(true, "OK", dtos));
+    }
+
+    /// <summary>清除指定端点的缓存和指标</summary>
+    [HttpPost("cache/{endpointId:guid}/refresh")]
+    public ActionResult<ApiResponse<object>> RefreshEndpointCache(Guid endpointId)
+    {
+        _router.InvalidateCache(endpointId);
+        return Ok(new ApiResponse<object>(true, "Cache cleared", null));
     }
 }

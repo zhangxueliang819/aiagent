@@ -95,9 +95,26 @@
       <!-- 输入区域 -->
       <div style="padding: 12px 20px; background: #fff; border-top: 1px solid #e6e6e6">
         <div style="display: flex; align-items: flex-end; gap: 8px">
-          <!-- 模型/AI 状态展示 -->
-          <div v-if="currentAgent" style="font-size: 12px; color: #999; white-space: nowrap; margin-right: 4px">
-            当前 Agent: <el-tag size="small">{{ currentAgent.name }}</el-tag>
+          <!-- Agent 选择器 -->
+          <div style="min-width: 160px">
+            <el-select
+              v-model="selectedAgentId"
+              placeholder="选择 Agent"
+              size="default"
+              filterable
+              @change="onAgentChange"
+              :disabled="isStreaming"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="a in agents"
+                :key="a.id"
+                :label="a.name"
+                :value="a.id"
+              >
+                <span>{{ a.name }}</span>
+              </el-option>
+            </el-select>
           </div>
           <el-input
             v-model="inputMessage"
@@ -165,21 +182,7 @@ const isStreaming = ref(false)
 const memoryTokens = ref(0)
 const agents = ref<AgentInfo[]>([])
 const currentAgent = ref<AgentInfo | null>(null)
-
-// 加载可用 Agent 列表
-async function loadAgents() {
-  try {
-    const res = await http.get('/agents')
-    if (res.data.success || Array.isArray(res.data)) {
-      agents.value = (res.data.data || res.data || []).map((a: any) => ({
-        id: a.id,
-        name: a.name
-      }))
-    }
-  } catch (e) {
-    console.error('加载 Agent 列表失败', e)
-  }
-}
+const selectedAgentId = ref<string>('')
 
 // 新建会话
 async function createNewSession() {
@@ -187,9 +190,16 @@ async function createNewSession() {
     ElMessage.warning('请先在 Agent 管理页创建至少一个 Agent')
     return
   }
-  // 使用第一个 Agent
-  const agentId = agents.value[0].id
-  currentAgent.value = agents.value[0]
+  if (!selectedAgentId.value) {
+    ElMessage.warning('请先选择一个 Agent')
+    return
+  }
+  const agent = agents.value.find(a => a.id === selectedAgentId.value)
+  if (!agent) {
+    ElMessage.warning('所选 Agent 不存在')
+    return
+  }
+  currentAgent.value = agent
   activeSessionId.value = ''
   messages.value = []
   memoryTokens.value = 0
@@ -348,11 +358,34 @@ async function sendMessage() {
   }
 }
 
+function onAgentChange(agentId: string) {
+  const agent = agents.value.find(a => a.id === agentId)
+  if (agent) {
+    currentAgent.value = agent
+  }
+}
+
+async function loadAgents() {
+  try {
+    const res = await http.get('/agents')
+    if (res.data.success || Array.isArray(res.data)) {
+      agents.value = (res.data.data || res.data || []).map((a: any) => ({
+        id: a.id,
+        name: a.name
+      }))
+      // 默认选中第一个
+      if (agents.value.length > 0 && !selectedAgentId.value) {
+        selectedAgentId.value = agents.value[0].id
+        currentAgent.value = agents.value[0]
+      }
+    }
+  } catch (e) {
+    console.error('加载 Agent 列表失败', e)
+  }
+}
+
 onMounted(async () => {
   await loadAgents()
-  if (agents.value.length > 0) {
-    currentAgent.value = agents.value[0]
-  }
   await loadSessions()
 })
 </script>

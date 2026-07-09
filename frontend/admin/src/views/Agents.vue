@@ -5,7 +5,32 @@
         <h3 style="margin:0">Agent 列表</h3>
         <el-button type="primary" @click="showDialog = true">创建 Agent</el-button>
       </div>
-      <el-table :data="agentStore.agents" v-loading="agentStore.loading" stripe>
+      <!-- 搜索/过滤栏 -->
+      <el-row :gutter="16" style="margin-bottom: 16px">
+        <el-col :span="8">
+          <el-input v-model="searchQuery" placeholder="搜索 Agent 名称…" clearable prefix-icon="Search" />
+        </el-col>
+        <el-col :span="4">
+          <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width:100%">
+            <el-option label="草稿" value="Draft" />
+            <el-option label="活跃" value="Active" />
+            <el-option label="运行中" value="Running" />
+            <el-option label="已暂停" value="Paused" />
+            <el-option label="已停止" value="Stopped" />
+            <el-option label="停用" value="Inactive" />
+            <el-option label="已归档" value="Archived" />
+          </el-select>
+        </el-col>
+        <el-col :span="4">
+          <el-select v-model="sortBy" placeholder="排序" style="width:100%">
+            <el-option label="创建时间(新→旧)" value="createdAt_desc" />
+            <el-option label="创建时间(旧→新)" value="createdAt_asc" />
+            <el-option label="名称(A→Z)" value="name_asc" />
+            <el-option label="名称(Z→A)" value="name_desc" />
+          </el-select>
+        </el-col>
+      </el-row>
+      <el-table :data="filteredAgents" v-loading="agentStore.loading" stripe>
         <el-table-column prop="name" label="名称" min-width="150" />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="modelEndpointName" label="模型" width="150">
@@ -45,6 +70,24 @@
           </el-select>
         </el-form-item>
         <el-form-item label="创建者"><el-input v-model="form.createdBy" /></el-form-item>
+        <el-divider content-position="left" style="margin: 12px 0">LLM 参数（可选，留空使用模型默认值）</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="Temperature">
+              <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="MaxTokens">
+              <el-input-number v-model="form.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="TopP">
+              <el-slider v-model="form.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -76,6 +119,24 @@
                 <el-option label="归档" value="Archived" />
               </el-select>
             </el-form-item>
+            <el-divider content-position="left" style="margin: 12px 0">LLM 参数（留空使用模型默认值）</el-divider>
+            <el-row :gutter="16">
+              <el-col :span="8">
+                <el-form-item label="Temperature">
+                  <el-slider v-model="editForm.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="MaxTokens">
+                  <el-input-number v-model="editForm.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="TopP">
+                  <el-slider v-model="editForm.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
           </el-form>
         </el-tab-pane>
 
@@ -148,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useAgentStore, type Agent, type AgentSkillBinding, type AgentMcpBinding } from '../stores/agent'
 import { useSkillStore, type Skill } from '../stores/skill'
 import { useModelStore } from '../stores/model'
@@ -158,14 +219,44 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const agentStore = useAgentStore()
 const skillStore = useSkillStore()
 const modelStore = useModelStore()
+
+// Search & Filter
+const searchQuery = ref('')
+const statusFilter = ref('')
+const sortBy = ref('createdAt_desc')
+
+const filteredAgents = computed(() => {
+  let list = [...agentStore.agents]
+  // 按名称搜索
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(a => a.name.toLowerCase().includes(q))
+  }
+  // 按状态筛选
+  if (statusFilter.value) {
+    list = list.filter(a => a.status === statusFilter.value)
+  }
+  // 排序
+  const [field, dir] = sortBy.value.split('_')
+  list.sort((a: any, b: any) => {
+    const va = a[field] || ''
+    const vb = b[field] || ''
+    if (typeof va === 'string') {
+      return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+    }
+    return dir === 'asc' ? va - vb : vb - va
+  })
+  return list
+})
+
 const showDialog = ref(false)
 const showEditDialog = ref(false)
 const creating = ref(false)
 const updating = ref(false)
 const editingId = ref('')
 
-const form = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, createdBy: 'admin' })
-const editForm = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, status: '' })
+const form = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, createdBy: 'admin', temperature: undefined as number | undefined, maxTokens: undefined as number | undefined, topP: undefined as number | undefined })
+const editForm = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, status: '', temperature: undefined as number | undefined, maxTokens: undefined as number | undefined, topP: undefined as number | undefined })
 
 // Edit dialog tabs
 const editActiveTab = ref('basic')
@@ -195,10 +286,15 @@ onMounted(() => {
 async function handleCreate() {
   creating.value = true
   try {
-    await agentStore.create({ ...form })
+    const payload = { ...form }
+    // 确保未填的 LLM 参数不发送
+    if (payload.temperature === undefined) delete payload.temperature
+    if (payload.maxTokens === undefined) delete payload.maxTokens
+    if (payload.topP === undefined) delete payload.topP
+    await agentStore.create(payload as any)
     ElMessage.success('创建成功')
     showDialog.value = false
-    Object.assign(form, { name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null, createdBy: 'admin' })
+    Object.assign(form, { name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null, createdBy: 'admin', temperature: undefined, maxTokens: undefined, topP: undefined })
   } catch {
     ElMessage.error('创建失败')
   } finally {
@@ -208,7 +304,7 @@ async function handleCreate() {
 
 function editAgent(agent: Agent) {
   editingId.value = agent.id
-  Object.assign(editForm, { name: agent.name, description: agent.description, systemPrompt: agent.systemPrompt, modelId: agent.modelId, modelEndpointId: agent.modelEndpointId, status: agent.status })
+  Object.assign(editForm, { name: agent.name, description: agent.description, systemPrompt: agent.systemPrompt, modelId: agent.modelId, modelEndpointId: agent.modelEndpointId, status: agent.status, temperature: agent.temperature, maxTokens: agent.maxTokens, topP: agent.topP })
   editActiveTab.value = 'basic'
   showEditDialog.value = true
 }

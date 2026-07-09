@@ -53,6 +53,7 @@ public class OpenAIProvider : IModelProvider
             messages = request.Messages.Select(m => new { role = MapRole(m.Role), content = m.Content }).ToArray(),
             max_tokens = request.MaxTokens,
             temperature = request.Temperature,
+            top_p = request.TopP ?? 1,
             stream = false
         };
 
@@ -71,6 +72,7 @@ public class OpenAIProvider : IModelProvider
             messages = request.Messages.Select(m => new { role = MapRole(m.Role), content = m.Content }).ToArray(),
             max_tokens = request.MaxTokens,
             temperature = request.Temperature,
+            top_p = request.TopP ?? 1,
             stream = true,
             stream_options = new { include_usage = true }
         };

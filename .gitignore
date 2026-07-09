@@ -1,0 +1,183 @@
+# =====================
+# .NET
+# =====================
+bin/
+obj/
+*.csproj.user
+*.suo
+*.sln.docstates
+*.user
+*.userosscache
+*.userprefs
+.vs/
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nupkg
+**/[Rr]elease[s]/
+
+# =====================
+# Visual Studio
+# =====================
+.vs/
+.vscode/
+.idea/
+*.sln.ide/
+
+# =====================
+# Node.js / Frontend
+# =====================
+node_modules/
+dist/
+frontend/admin/dist/
+*.tsbuildinfo
+*.tsbuildinfo.*
+.vite/
+
+# =====================
+# JetBrains Rider
+# =====================
+.idea/
+*.sln.iml
+Exported/
+out/
+
+# =====================
+# macOS
+# =====================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# =====================
+# Windows
+# =====================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =====================
+# Secrets & Config
+# =====================
+appsettings.Development.json
+appsettings.*.local.json
+*.Development.json
+secrets.json
+*.secret.*
+
+# =====================
+# Logs & Temp
+# =====================
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# =====================
+# Tests
+# =====================
+tests/**/TestResults/
+tests/**/coverage/
+
+# =====================
+# Docker
+# =====================
+docker-data/
+
+# =====================
+# Database snapshot
+# =====================
+data/
+# =====================
+# .NET
+# =====================
+bin/
+obj/
+*.csproj.user
+*.suo
+*.sln.docstates
+*.user
+*.userosscache
+*.userprefs
+*.vs/
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nupkg
+**/[Rr]elease[s]/
+
+# =====================
+# Visual Studio
+# =====================
+.vs/
+.vscode/
+.idea/
+*.sln.ide/
+
+# =====================
+# Node.js / Frontend
+# =====================
+node_modules/
+dist/
+frontend/admin/dist/
+*.tsbuildinfo
+*.tsbuildinfo.*
+.vite/
+
+# =====================
+# JetBrains Rider
+# =====================
+.idea/
+*.sln.iml
+Exported/
+out/
+
+# =====================
+# macOS
+# =====================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+Thumbs.db
+
+# =====================
+# Windows
+# =====================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =====================
+# Secrets & Config
+# =====================
+appsettings.Development.json
+appsettings.*.local.json
+*.Development.json
+secrets.json
+*.secret.*
+
+# =====================
+# Logs & Temp
+# =====================
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# =====================
+# Tests
+# =====================
+tests/**/TestResults/
+tests/**/coverage/
+
+# =====================
+# Docker
+# =====================
+docker-data/

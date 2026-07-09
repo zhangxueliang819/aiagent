@@ -31,6 +31,7 @@ public class ModelProviderService
             ProviderType = request.ProviderType,
             ApiBaseUrl = request.ApiBaseUrl,
             EncryptedApiKey = request.ApiKey, // TODO: encrypt
+            RoutingStrategy = request.RoutingStrategy,
             CreatedAt = DateTime.UtcNow
         };
         var result = await _repository.AddAsync(provider, ct);
@@ -70,12 +71,16 @@ public class ModelProviderService
             MaxTokens = request.MaxTokens,
             InputPricePer1K = request.InputPricePer1K,
             OutputPricePer1K = request.OutputPricePer1K,
-            IsEnabled = true
+            IsEnabled = true,
+            Weight = request.Weight,
+            RpmLimit = request.RpmLimit,
+            TpmLimit = request.TpmLimit
         };
 
         var result = await _repository.AddEndpointAsync(endpoint, ct);
 
-        return new ModelEndpointDto(result.Id, result.ModelId, result.ModelName, result.MaxTokens, result.IsEnabled);
+        return new ModelEndpointDto(result.Id, result.ModelId, result.ModelName, result.MaxTokens, result.IsEnabled,
+            result.Weight, result.RpmLimit, result.TpmLimit);
     }
 
     public async Task<bool> DeleteEndpointAsync(Guid endpointId, CancellationToken ct = default)
@@ -89,6 +94,7 @@ public class ModelProviderService
     }
 
     private static ModelProviderDto Map(ModelProvider p) => new(
-        p.Id, p.Name, p.ProviderType, p.ApiBaseUrl, p.IsEnabled, p.CreatedAt,
-        p.Endpoints.Select(e => new ModelEndpointDto(e.Id, e.ModelId, e.ModelName, e.MaxTokens, e.IsEnabled)).ToList());
+        p.Id, p.Name, p.ProviderType, p.ApiBaseUrl, p.IsEnabled, p.RoutingStrategy, p.CreatedAt,
+        p.Endpoints.Select(e => new ModelEndpointDto(e.Id, e.ModelId, e.ModelName, e.MaxTokens, e.IsEnabled,
+            e.Weight, e.RpmLimit, e.TpmLimit)).ToList());
 }

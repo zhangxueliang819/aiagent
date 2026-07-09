@@ -44,10 +44,17 @@ public class AgentsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<AgentDto>>> Update(Guid id, [FromBody] UpdateAgentRequest request, CancellationToken ct)
     {
-        var agent = await _service.UpdateAsync(id, request, ct);
-        if (agent is null)
-            return NotFound(new ApiResponse<AgentDto>(false, "Agent not found", null));
-        return Ok(new ApiResponse<AgentDto>(true, "Updated", agent));
+        try
+        {
+            var agent = await _service.UpdateAsync(id, request, ct);
+            if (agent is null)
+                return NotFound(new ApiResponse<AgentDto>(false, "Agent not found", null));
+            return Ok(new ApiResponse<AgentDto>(true, "Updated", agent));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiResponse<AgentDto>(false, ex.Message, null));
+        }
     }
 
     [HttpDelete("{id:guid}")]
@@ -55,5 +62,69 @@ public class AgentsController : ControllerBase
     {
         await _service.DeleteAsync(id, ct);
         return Ok(new ApiResponse<object>(true, "Deleted", null));
+    }
+
+    // ── 状态切换 ──
+
+    [HttpPost("{id:guid}/activate")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> Activate(Guid id, CancellationToken ct)
+        => await ChangeStatus(id, "Active", ct);
+
+    [HttpPost("{id:guid}/pause")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> Pause(Guid id, CancellationToken ct)
+        => await ChangeStatus(id, "Paused", ct);
+
+    [HttpPost("{id:guid}/stop")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> Stop(Guid id, CancellationToken ct)
+        => await ChangeStatus(id, "Stopped", ct);
+
+    [HttpPost("{id:guid}/archive")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> Archive(Guid id, CancellationToken ct)
+        => await ChangeStatus(id, "Archived", ct);
+
+    [HttpPut("{id:guid}/status")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> ChangeStatus(Guid id, [FromBody] ChangeAgentStatusRequest request, CancellationToken ct)
+        => await ChangeStatus(id, request.Status, ct);
+
+    private async Task<ActionResult<ApiResponse<AgentDto>>> ChangeStatus(Guid id, string status, CancellationToken ct)
+    {
+        try
+        {
+            var agent = await _service.ChangeStatusAsync(id, status, ct);
+            if (agent is null)
+                return NotFound(new ApiResponse<AgentDto>(false, "Agent not found", null));
+            _logger.LogInformation("Agent {AgentId} status changed to {Status}", id, status);
+            return Ok(new ApiResponse<AgentDto>(true, $"状态已切换为 {status}", agent));
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return BadRequest(new ApiResponse<AgentDto>(false, ex.Message, null));
+        }
+    }
+
+    // ── 克隆 ──
+
+    [HttpPost("{id:guid}/clone")]
+    public async Task<ActionResult<ApiResponse<AgentDto>>> Clone(Guid id, [FromBody] CloneAgentRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var agent = await _service.CloneAsync(id, request, ct);
+            _logger.LogInformation("Agent cloned: {SourceId} -> {CloneId}", id, agent.Id);
+            return CreatedAtAction(nameof(GetById), new { id = agent.Id }, new ApiResponse<AgentDto>(true, "Cloned", agent));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiResponse<AgentDto>(false, ex.Message, null));
+        }
+    }
+
+    // ── 版本历史 ──
+
+    [HttpGet("{id:guid}/versions")]
+    public async Task<ActionResult<ApiResponse<List<AgentVersionDto>>>> GetVersions(Guid id, CancellationToken ct)
+    {
+        var versions = await _service.GetVersionsAsync(id, ct);
+        return Ok(new ApiResponse<List<AgentVersionDto>>(true, "OK", versions));
     }
 }

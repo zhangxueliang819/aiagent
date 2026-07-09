@@ -21,6 +21,8 @@ public interface IModelProviderRepository
     Task<ModelEndpoint?> GetEndpointWithProviderAsync(Guid endpointId, CancellationToken ct = default);
     Task<ModelEndpoint> AddEndpointAsync(ModelEndpoint endpoint, CancellationToken ct = default);
     Task DeleteEndpointAsync(ModelEndpoint endpoint, CancellationToken ct = default);
+    /// <summary>获取某 Provider 下所有启用的端点（含 Provider 导航属性）</summary>
+    Task<List<ModelEndpoint>> GetEnabledEndpointsByProviderAsync(Guid providerId, CancellationToken ct = default);
 }
 
 public interface ISkillRepository
@@ -38,12 +40,16 @@ public interface ISessionRepository
     Task<Session?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Session> AddAsync(Session session, CancellationToken ct = default);
     Task<Conversation> AddConversationAsync(Conversation conversation, CancellationToken ct = default);
+    Task UpdateAsync(Session session, CancellationToken ct = default);
+    Task<List<Session>> GetActiveSessionsOlderThanAsync(DateTime threshold, CancellationToken ct = default);
 }
 
 public interface IUsageRepository
 {
     Task<List<UsageRecord>> GetByUserIdAsync(string userId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<List<UsageRecord>> GetByAgentIdAsync(Guid agentId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<UsageRecord> AddAsync(UsageRecord record, CancellationToken ct = default);
+    Task<List<UsageRecord>> GetAllAsync(DateTime from, DateTime to, CancellationToken ct = default);
 }
 
 public interface IMcpEndpointRepository
@@ -73,5 +79,28 @@ public interface IAgentSkillRepository
 {
     Task<List<AgentSkill>> GetByAgentIdAsync(Guid agentId, CancellationToken ct = default);
     Task<AgentSkill> AddAsync(AgentSkill binding, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
+}
+
+public interface IAgentVersionRepository
+{
+    Task<List<AgentVersion>> GetByAgentIdAsync(Guid agentId, CancellationToken ct = default);
+    Task<AgentVersion> AddAsync(AgentVersion version, CancellationToken ct = default);
+    Task<int> GetNextVersionNumberAsync(Guid agentId, CancellationToken ct = default);
+}
+
+public interface IAuditLogRepository
+{
+    Task<List<AuditLog>> GetAllAsync(DateTime from, DateTime to, CancellationToken ct = default);
+    Task<AuditLog> AddAsync(AuditLog log, CancellationToken ct = default);
+}
+
+public interface IUserRepository
+{
+    Task<List<User>> GetAllAsync(CancellationToken ct = default);
+    Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<User?> GetByUsernameAsync(string username, CancellationToken ct = default);
+    Task<User> AddAsync(User user, CancellationToken ct = default);
+    Task<User> UpdateAsync(User user, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

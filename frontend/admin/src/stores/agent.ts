@@ -15,6 +15,9 @@ export interface Agent {
   createdBy: string
   createdAt: string
   updatedAt: string
+  temperature: number | null
+  maxTokens: number | null
+  topP: number | null
   configurations: { id: string; key: string; value: string; valueType: string }[]
   skills: { id: string; skillId: string; priority: number; isEnabled: boolean }[]
 }
@@ -64,7 +67,7 @@ export const useAgentStore = defineStore('agent', () => {
     return res.data.data
   }
 
-  async function update(id: string, data: { name?: string; description?: string; systemPrompt?: string; modelId?: string; modelEndpointId?: string | null; status?: string }) {
+  async function update(id: string, data: { name?: string; description?: string; systemPrompt?: string; modelId?: string; modelEndpointId?: string | null; status?: string; temperature?: number | null; maxTokens?: number | null; topP?: number | null }) {
     const res = await http.put<{ data: Agent }>(`/agents/${id}`, data)
     const idx = agents.value.findIndex(a => a.id === id)
     if (idx >= 0) agents.value[idx] = res.data.data

@@ -9,6 +9,8 @@ public class Session
     public SessionStatus Status { get; set; } = SessionStatus.Active;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>会话过期时间，超过此时间未更新自动回收</summary>
+    public DateTime? ExpiresAt { get; set; }
 
     public List<Conversation> Conversations { get; set; } = new();
 }
