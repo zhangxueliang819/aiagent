@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentPlatform.Core\AgentPlatform.Core.csproj" />
+    <ProjectReference Include="..\AgentPlatform.Application\AgentPlatform.Application.csproj" />
+    <ProjectReference Include="..\AgentPlatform.Infrastructure\AgentPlatform.Infrastructure.csproj" />
+    <ProjectReference Include="..\AgentPlatform.AgentEngine\AgentPlatform.AgentEngine.csproj" />
+    <ProjectReference Include="..\AgentPlatform.ModelProviders\AgentPlatform.ModelProviders.csproj" />
+    <ProjectReference Include="..\AgentPlatform.Memory\AgentPlatform.Memory.csproj" />
+    <ProjectReference Include="..\AgentPlatform.Session\AgentPlatform.Session.csproj" />
+    <ProjectReference Include="..\AgentPlatform.Billing\AgentPlatform.Billing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0-preview.1.25081.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0-preview.2.25163.8" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

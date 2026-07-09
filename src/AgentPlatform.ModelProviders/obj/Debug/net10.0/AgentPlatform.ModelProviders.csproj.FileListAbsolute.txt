@@ -1,0 +1,15 @@
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\bin\Debug\net10.0\AgentPlatform.ModelProviders.deps.json
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\bin\Debug\net10.0\AgentPlatform.ModelProviders.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\bin\Debug\net10.0\AgentPlatform.ModelProviders.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\bin\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\bin\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.csproj.AssemblyReference.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.GeneratedMSBuildEditorConfig.editorconfig
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.AssemblyInfoInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.AssemblyInfo.cs
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.csproj.CoreCompileInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPla.9865543D.Up2Date
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\refint\AgentPlatform.ModelProviders.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\AgentPlatform.ModelProviders.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.ModelProviders\obj\Debug\net10.0\ref\AgentPlatform.ModelProviders.dll

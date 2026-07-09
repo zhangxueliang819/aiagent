@@ -1,0 +1,6 @@
+@AgentPlatform.Web_HostAddress = http://localhost:5092
+
+GET {{AgentPlatform.Web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,15 @@
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\bin\Debug\net10.0\AgentPlatform.Session.deps.json
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\bin\Debug\net10.0\AgentPlatform.Session.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\bin\Debug\net10.0\AgentPlatform.Session.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\bin\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\bin\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.csproj.AssemblyReference.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.GeneratedMSBuildEditorConfig.editorconfig
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.AssemblyInfoInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.AssemblyInfo.cs
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.csproj.CoreCompileInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPla.3D8F1E19.Up2Date
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\refint\AgentPlatform.Session.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\AgentPlatform.Session.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Session\obj\Debug\net10.0\ref\AgentPlatform.Session.dll

@@ -1,0 +1,1 @@
+import{_ as n,j as r,w as t,a as c,h as _,e as o,f as l}from"./index-DmZrGJfV.js";const d={};function p(m,e){const a=o("el-empty"),s=o("el-card");return l(),r(s,null,{header:t(()=>[...e[0]||(e[0]=[_("用量统计",-1)])]),default:t(()=>[c(a,{description:"用量统计功能将在 Phase 2 中实现","image-size":120})]),_:1})}const i=n(d,[["render",p]]);export{i as default};

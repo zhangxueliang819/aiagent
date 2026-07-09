@@ -1,0 +1,11 @@
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\bin\Debug\net10.0\AgentPlatform.Core.deps.json
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\bin\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\bin\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.AssemblyInfoInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.AssemblyInfo.cs
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.csproj.CoreCompileInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\refint\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Core\obj\Debug\net10.0\ref\AgentPlatform.Core.dll

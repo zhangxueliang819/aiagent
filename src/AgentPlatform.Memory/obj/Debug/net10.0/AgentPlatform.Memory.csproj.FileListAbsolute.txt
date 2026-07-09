@@ -1,0 +1,15 @@
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\bin\Debug\net10.0\AgentPlatform.Memory.deps.json
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\bin\Debug\net10.0\AgentPlatform.Memory.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\bin\Debug\net10.0\AgentPlatform.Memory.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\bin\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\bin\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.csproj.AssemblyReference.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.GeneratedMSBuildEditorConfig.editorconfig
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.AssemblyInfoInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.AssemblyInfo.cs
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.csproj.CoreCompileInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPla.2665B647.Up2Date
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\refint\AgentPlatform.Memory.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\AgentPlatform.Memory.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Memory\obj\Debug\net10.0\ref\AgentPlatform.Memory.dll

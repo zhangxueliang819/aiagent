@@ -1,0 +1,15 @@
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\bin\Debug\net10.0\AgentPlatform.Billing.deps.json
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\bin\Debug\net10.0\AgentPlatform.Billing.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\bin\Debug\net10.0\AgentPlatform.Billing.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\bin\Debug\net10.0\AgentPlatform.Core.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\bin\Debug\net10.0\AgentPlatform.Core.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.csproj.AssemblyReference.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.GeneratedMSBuildEditorConfig.editorconfig
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.AssemblyInfoInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.AssemblyInfo.cs
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.csproj.CoreCompileInputs.cache
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPla.603D4D6C.Up2Date
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\refint\AgentPlatform.Billing.dll
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\AgentPlatform.Billing.pdb
+D:\BeisenCode\AI Tools\aiAgent\src\AgentPlatform.Billing\obj\Debug\net10.0\ref\AgentPlatform.Billing.dll

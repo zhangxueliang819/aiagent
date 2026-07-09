@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentPlatform.AgentEngine/AgentPlatform.AgentEngine.csproj" />
+    <Project Path="src/AgentPlatform.Application/AgentPlatform.Application.csproj" />
+    <Project Path="src/AgentPlatform.Billing/AgentPlatform.Billing.csproj" />
+    <Project Path="src/AgentPlatform.Core/AgentPlatform.Core.csproj" />
+    <Project Path="src/AgentPlatform.Infrastructure/AgentPlatform.Infrastructure.csproj" />
+    <Project Path="src/AgentPlatform.Memory/AgentPlatform.Memory.csproj" />
+    <Project Path="src/AgentPlatform.ModelProviders/AgentPlatform.ModelProviders.csproj" />
+    <Project Path="src/AgentPlatform.Session/AgentPlatform.Session.csproj" />
+    <Project Path="src/AgentPlatform.Web/AgentPlatform.Web.csproj" />
+  </Folder>
+</Solution>
