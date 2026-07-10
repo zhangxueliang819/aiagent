@@ -113,7 +113,7 @@
   --icon-size-2xl: 48px;
 
   --layout-header-height: 56px;
-  --layout-content-padding: 20px;
+  --layout-content-padding: 12px;
 
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
@@ -272,7 +272,7 @@
   --layout-header-height: 60px;
   --layout-sidebar-width: 220px;
   --layout-sidebar-collapsed-width: 64px;
-  --layout-content-padding: 20px;
+  --layout-content-padding: 12px;
 
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;

@@ -9,7 +9,7 @@
       <el-table :data="endpoints" v-loading="loading" stripe row-key="id">
         <el-table-column type="expand">
           <template #default="{ row }">
-            <div style="padding: 0 20px 12px">
+            <div style="padding: 0 16px 12px">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
                 <h4 style="margin:0">已发现工具 ({{ row.tools?.length || 0 }})</h4>
                 <el-button size="small" type="primary" @click="handleDiscover(row.id)" :loading="discoveringId === row.id">

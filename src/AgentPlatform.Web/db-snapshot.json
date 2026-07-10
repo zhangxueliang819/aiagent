@@ -1,0 +1,160 @@
+{
+  "savedAt": "2026-07-10T06:24:09.3982143Z",
+  "agents": [
+    {
+      "id": "0dbbf9cb-1f8d-49ae-940a-d0ab01c79810",
+      "name": "AI \u52A9\u624B",
+      "description": "\u8BA1\u7B97\u5DE5\u5177",
+      "systemPrompt": "\u53EA\u8D1F\u8D23\u8FDB\u884C\u5404\u79CD\u6570\u636E\u8BA1\u7B97\uFF0C\u5176\u4ED6\u90FD\u8FD4\u56DE\u4E0D\u652F\u6301",
+      "modelEndpointId": "50176833-8ed3-4514-969f-3fe6a581b20d",
+      "modelId": "",
+      "status": 1,
+      "version": "1.0.0",
+      "createdBy": "admin",
+      "createdAt": "2026-07-10T06:19:12.6420431Z",
+      "updatedAt": "2026-07-10T06:23:09.8398063Z",
+      "temperature": null,
+      "maxTokens": null,
+      "topP": null,
+      "configurations": [],
+      "skills": [],
+      "mcpEndpoints": [],
+      "modelEndpoint": null
+    }
+  ],
+  "agentConfigurations": [],
+  "agentSkills": [],
+  "agentMcpEndpoints": [],
+  "modelProviders": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "OpenAI Default",
+      "providerType": "OpenAI",
+      "apiBaseUrl": "https://api.openai.com/v1",
+      "encryptedApiKey": "",
+      "isEnabled": true,
+      "createdAt": "2026-07-10T03:42:22.6172247Z",
+      "routingStrategy": "RoundRobin",
+      "endpoints": []
+    },
+    {
+      "id": "712aaf84-8be1-4dc4-862f-db2489ead21b",
+      "name": "seepseek",
+      "providerType": "OpenAI",
+      "apiBaseUrl": "https://api.deepseek.com",
+      "encryptedApiKey": "sk-57c64876144b4c1c81ee78a45cc70e9d",
+      "isEnabled": true,
+      "createdAt": "2026-07-10T06:17:05.2891724Z",
+      "routingStrategy": "RoundRobin",
+      "endpoints": []
+    }
+  ],
+  "modelEndpoints": [
+    {
+      "id": "20000000-0000-0000-0000-000000000001",
+      "modelProviderId": "10000000-0000-0000-0000-000000000001",
+      "modelId": "gpt-4o",
+      "modelName": "GPT-4o",
+      "maxTokens": 128000,
+      "inputPricePer1K": 0,
+      "outputPricePer1K": 0,
+      "isEnabled": true,
+      "weight": 1,
+      "rpmLimit": 0,
+      "tpmLimit": 0,
+      "modelProvider": null
+    },
+    {
+      "id": "50176833-8ed3-4514-969f-3fe6a581b20d",
+      "modelProviderId": "712aaf84-8be1-4dc4-862f-db2489ead21b",
+      "modelId": "deepseek-v4-flash",
+      "modelName": "deepseek-v4-flash",
+      "maxTokens": 4096,
+      "inputPricePer1K": 0,
+      "outputPricePer1K": 0,
+      "isEnabled": true,
+      "weight": 1,
+      "rpmLimit": 0,
+      "tpmLimit": 0,
+      "modelProvider": null
+    }
+  ],
+  "skills": [],
+  "mcpEndpoints": [],
+  "mcpTools": [],
+  "sessions": [
+    {
+      "id": "60ef29e4-f561-479f-a8d6-9b7d8f433155",
+      "title": "\u4F60\u90FD\u4F1A\u4EC0\u4E48",
+      "agentId": "0dbbf9cb-1f8d-49ae-940a-d0ab01c79810",
+      "userId": "anonymous",
+      "status": 0,
+      "createdAt": "2026-07-10T06:19:25.2511892Z",
+      "updatedAt": "2026-07-10T06:19:25.2512233Z",
+      "expiresAt": null,
+      "conversations": []
+    }
+  ],
+  "conversations": [
+    {
+      "id": "fa970206-67b6-4f2f-969f-b0bd30f381b2",
+      "sessionId": "60ef29e4-f561-479f-a8d6-9b7d8f433155",
+      "role": "user",
+      "content": "\u4F60\u90FD\u4F1A\u4EC0\u4E48",
+      "tokenCount": 4,
+      "createdAt": "2026-07-10T06:19:25.2774922Z",
+      "session": null
+    },
+    {
+      "id": "f741fd3e-b0d2-4db2-b062-4969aacff75f",
+      "sessionId": "60ef29e4-f561-479f-a8d6-9b7d8f433155",
+      "role": "assistant",
+      "content": "\u6211\u53EA\u8D1F\u8D23\u8FDB\u884C\u5404\u79CD\u6570\u636E\u8BA1\u7B97\uFF0C\u5982\u6570\u5B66\u8FD0\u7B97\u3001\u7EDF\u8BA1\u5206\u6790\u3001\u516C\u5F0F\u63A8\u5BFC\u7B49\u3002\u5176\u4ED6\u975E\u8BA1\u7B97\u7C7B\u7684\u95EE\u9898\uFF0C\u6211\u90FD\u4F1A\u8FD4\u56DE\u201C\u4E0D\u652F\u6301\u201D\u3002",
+      "tokenCount": 31,
+      "createdAt": "2026-07-10T06:20:09.2910198Z",
+      "session": null
+    },
+    {
+      "id": "d19ab525-7352-44a6-b2be-80be810df103",
+      "sessionId": "60ef29e4-f561-479f-a8d6-9b7d8f433155",
+      "role": "user",
+      "content": "\u4F60\u662F\u8C01",
+      "tokenCount": 3,
+      "createdAt": "2026-07-10T06:20:34.5789407Z",
+      "session": null
+    },
+    {
+      "id": "75ac41fb-faa5-4d26-824c-6886cfab1fc4",
+      "sessionId": "60ef29e4-f561-479f-a8d6-9b7d8f433155",
+      "role": "assistant",
+      "content": "\u4E0D\u652F\u6301\u3002",
+      "tokenCount": 3,
+      "createdAt": "2026-07-10T06:20:37.9919916Z",
+      "session": null
+    }
+  ],
+  "usageRecords": [],
+  "apiKeys": [],
+  "agentVersions": [
+    {
+      "id": "5e891610-cedb-43a8-9463-012d1123425c",
+      "agentId": "0dbbf9cb-1f8d-49ae-940a-d0ab01c79810",
+      "versionNumber": 1,
+      "snapshotJson": "{\u0022Name\u0022:\u0022AI \\u52A9\\u624B\u0022,\u0022Description\u0022:\u0022\\u8BA1\\u7B97\\u5DE5\\u5177\u0022,\u0022SystemPrompt\u0022:\u0022\\u53EA\\u8D1F\\u8D23\\u8FDB\\u884C\\u5404\\u79CD\\u6570\\u636E\\u8BA1\\u7B97\\uFF0C\\u5176\\u4ED6\\u90FD\\u8FD4\\u56DE\\u4E0D\\u652F\\u6301\u0022,\u0022ModelId\u0022:\u0022\u0022,\u0022ModelEndpointId\u0022:\u002250176833-8ed3-4514-969f-3fe6a581b20d\u0022,\u0022Temperature\u0022:null,\u0022MaxTokens\u0022:null,\u0022TopP\u0022:null,\u0022Status\u0022:\u0022Draft\u0022,\u0022Configurations\u0022:[],\u0022McpEndpoints\u0022:[],\u0022Skills\u0022:[]}",
+      "changeSummary": "\u521D\u59CB\u521B\u5EFA",
+      "changedBy": "admin",
+      "createdAt": "2026-07-10T06:19:12.707549Z"
+    },
+    {
+      "id": "2c9e588b-120f-490e-aeb5-847c4031bb7e",
+      "agentId": "0dbbf9cb-1f8d-49ae-940a-d0ab01c79810",
+      "versionNumber": 2,
+      "snapshotJson": "{\u0022Name\u0022:\u0022AI \\u52A9\\u624B\u0022,\u0022Description\u0022:\u0022\\u8BA1\\u7B97\\u5DE5\\u5177\u0022,\u0022SystemPrompt\u0022:\u0022\\u53EA\\u8D1F\\u8D23\\u8FDB\\u884C\\u5404\\u79CD\\u6570\\u636E\\u8BA1\\u7B97\\uFF0C\\u5176\\u4ED6\\u90FD\\u8FD4\\u56DE\\u4E0D\\u652F\\u6301\u0022,\u0022ModelId\u0022:\u0022\u0022,\u0022ModelEndpointId\u0022:\u002250176833-8ed3-4514-969f-3fe6a581b20d\u0022,\u0022Temperature\u0022:null,\u0022MaxTokens\u0022:null,\u0022TopP\u0022:null,\u0022Status\u0022:\u0022Active\u0022,\u0022Configurations\u0022:[],\u0022McpEndpoints\u0022:[],\u0022Skills\u0022:[]}",
+      "changeSummary": "\u66F4\u65B0: \u540D\u79F0, \u63CF\u8FF0, SystemPrompt, \u6A21\u578BID, \u6A21\u578B\u7AEF\u70B9, \u72B6\u6001(Active)",
+      "changedBy": "Active",
+      "createdAt": "2026-07-10T06:23:09.8416999Z"
+    }
+  ],
+  "auditLogs": [],
+  "users": []
+}

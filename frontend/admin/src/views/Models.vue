@@ -9,7 +9,7 @@
       <el-table :data="modelStore.providers" v-loading="modelStore.loading" stripe row-key="id">
         <el-table-column type="expand">
           <template #default="{ row: provider }">
-            <div style="padding: 0 20px 12px">
+            <div style="padding: 0 16px 12px">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
                 <h4 style="margin:0">模型端点</h4>
                 <el-button size="small" type="primary" @click="openEndpointDialog(provider.id)">添加端点</el-button>

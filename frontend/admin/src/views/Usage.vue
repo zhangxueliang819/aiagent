@@ -295,7 +295,7 @@ onMounted(loadData)
 
 <style scoped>
 .usage-page {
-  padding: 16px;
+  padding: var(--layout-content-padding);
 }
 .filter-card {
   margin-bottom: 16px;

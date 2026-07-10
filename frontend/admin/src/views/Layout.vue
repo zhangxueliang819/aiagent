@@ -257,6 +257,11 @@ async function handleLogout() {
   transition: background var(--transition-normal);
 }
 
+/* 缩小 el-card 内边距，整体更紧凑 */
+.layout-main :deep(.el-card__body) {
+  padding: 16px;
+}
+
 :deep(.el-drawer__body) {
   padding: 0;
 }

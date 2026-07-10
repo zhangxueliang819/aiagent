@@ -1,15 +1,15 @@
 <template>
-  <el-container style="height: calc(100vh - 120px)">
+  <el-container class="chat-container">
     <!-- 左侧：会话列表 -->
-    <el-aside width="260px" style="background: #fff; border-right: 1px solid #e6e6e6; overflow-y: auto">
+    <el-aside width="260px" class="chat-sidebar">
       <div style="padding: 12px">
         <el-button type="primary" style="width: 100%" @click="createNewSession" :icon="Plus">
           新建会话
         </el-button>
       </div>
-      <div style="padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f0f0f0">
-        <span style="font-size: 13px; font-weight: 600; color: #303133">会话列表</span>
-        <el-button text size="small" :icon="Delete" @click="handleClearMessages" :disabled="messages.length === 0" style="color: #909399">
+      <div class="session-header">
+        <span style="font-size: 13px; font-weight: 600; color: var(--text-primary)">会话列表</span>
+        <el-button text size="small" :icon="Delete" @click="handleClearMessages" :disabled="messages.length === 0" style="color: var(--text-muted)">
           清空消息
         </el-button>
       </div>
@@ -33,7 +33,7 @@
           </template>
         </el-menu-item>
       </el-menu>
-      <div v-if="sessions.length === 0" style="text-align: center; color: #999; padding: 20px">
+      <div v-if="sessions.length === 0" style="text-align: center; color: var(--text-muted); padding: 20px">
         暂无会话
       </div>
     </el-aside>
@@ -41,8 +41,8 @@
     <!-- 右侧：对话区域 -->
     <el-container style="flex-direction: column">
       <!-- 顶部：Agent 选择栏 -->
-      <div style="padding: 12px 20px; background: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; gap: 12px">
-        <span style="font-size: 14px; color: #606266; white-space: nowrap">当前 Agent：</span>
+      <div class="agent-bar">
+        <span style="font-size: 14px; color: var(--text-secondary); white-space: nowrap">当前 Agent：</span>
         <el-select
           v-model="selectedAgentId"
           placeholder="选择 Agent"
@@ -64,8 +64,8 @@
       </div>
 
       <!-- 消息列表 -->
-      <el-main style="flex: 1; overflow-y: auto; background: #f5f5f5; padding: 20px">
-        <div v-if="messages.length === 0" style="text-align: center; padding-top: 100px; color: #999">
+      <el-main class="chat-messages">
+        <div v-if="messages.length === 0" style="text-align: center; padding-top: 100px; color: var(--text-muted)">
           <el-icon :size="48"><ChatDotSquare /></el-icon>
           <p style="margin-top: 16px">开始与 Agent 对话</p>
         </div>
@@ -80,24 +80,24 @@
 
           <!-- 助手消息 -->
           <div v-else-if="msg.role === 'assistant'" style="display: flex; justify-content: flex-start; flex-direction: column">
-            <div style="max-width: 85%; background: #fff; padding: 12px 16px; border-radius: 0 12px 12px 12px; word-break: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05)">
+            <div class="assistant-bubble">
               <!-- 思考过程折叠面板 -->
-              <el-collapse v-if="msg.thinking" style="margin-bottom: 8px; background: #f8f9fa; border-radius: 6px" :model-value="['thinking']">
+              <el-collapse v-if="msg.thinking" class="thinking-panel" :model-value="['thinking']">
                 <el-collapse-item title="🤔 思考过程" name="thinking">
-                  <pre style="white-space: pre-wrap; font-size: 12px; color: #555; line-height: 1.6; max-height: 300px; overflow-y: auto; margin: 0">{{ msg.thinking }}</pre>
+                  <pre style="white-space: pre-wrap; font-size: 12px; color: var(--text-secondary); line-height: 1.6; max-height: 300px; overflow-y: auto; margin: 0">{{ msg.thinking }}</pre>
                 </el-collapse-item>
               </el-collapse>
-              <div v-if="msg.isStreaming" style="font-style: italic; color: #999">正在输入...</div>
+              <div v-if="msg.isStreaming" style="font-style: italic; color: var(--text-muted)">正在输入...</div>
               <div v-else style="white-space: pre-wrap">{{ msg.content }}</div>
               <!-- 模型元信息 -->
-              <div v-if="!msg.isStreaming && msg.modelName" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; font-size: 11px; color: #999; display: flex; gap: 16px; flex-wrap: wrap">
+              <div v-if="!msg.isStreaming && msg.modelName" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap">
                 <span>模型: {{ msg.modelName }}</span>
                 <span v-if="msg.inputTokens != null">输入: {{ msg.inputTokens }} tokens</span>
                 <span v-if="msg.outputTokens != null">输出: {{ msg.outputTokens }} tokens</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; margin-left: 4px">
-              <span v-if="msg.tokenCount" style="font-size: 11px; color: #bbb">
+              <span v-if="msg.tokenCount" style="font-size: 11px; color: var(--text-muted)">
                 {{ msg.tokenCount }} tokens
               </span>
               <template v-if="!msg.isStreaming && msg.content">
@@ -125,9 +125,9 @@
                     <el-tag size="small" type="success" style="margin-left: 8px">完成</el-tag>
                   </template>
                   <div style="padding: 8px">
-                    <div style="font-size: 12px; color: #999; margin-bottom: 4px">参数：</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px">参数：</div>
                     <pre style="background: #f8f8f8; padding: 8px; border-radius: 4px; font-size: 12px; overflow-x: auto">{{ JSON.stringify(tc.arguments, null, 2) }}</pre>
-                    <div style="font-size: 12px; color: #999; margin: 8px 0 4px">结果：</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin: 8px 0 4px">结果：</div>
                     <pre style="background: #f8f8f8; padding: 8px; border-radius: 4px; font-size: 12px; overflow-x: auto; max-height: 120px">{{ tc.result }}</pre>
                   </div>
                 </el-collapse-item>
@@ -139,12 +139,12 @@
         <!-- 加载指示器 -->
         <div v-if="isStreaming" style="text-align: center; padding: 12px">
           <el-icon class="is-loading" :size="20"><Loading /></el-icon>
-          <span style="margin-left: 8px; color: #999">Agent 正在处理...</span>
+          <span style="margin-left: 8px; color: var(--text-muted)">Agent 正在处理...</span>
         </div>
       </el-main>
 
       <!-- 输入区域 -->
-      <div style="padding: 12px 20px; background: #fff; border-top: 1px solid #e6e6e6">
+      <div class="input-area">
         <div style="display: flex; align-items: flex-end; gap: 8px">
           <div style="flex: 1; position: relative">
             <el-input
@@ -157,7 +157,7 @@
               :maxlength="4000"
               @keydown.enter.exact.prevent="sendMessage"
             />
-            <div style="position: absolute; right: 10px; bottom: 4px; font-size: 11px; color: #bbb; pointer-events: none">
+            <div style="position: absolute; right: 10px; bottom: 4px; font-size: 11px; color: var(--text-muted); pointer-events: none">
               {{ inputMessage.length }}/4000
             </div>
           </div>
@@ -170,7 +170,7 @@
             发送
           </el-button>
         </div>
-        <div v-if="memoryTokens > 0" style="margin-top: 4px; font-size: 11px; color: #bbb; text-align: right">
+        <div v-if="memoryTokens > 0" style="margin-top: 4px; font-size: 11px; color: var(--text-muted); text-align: right">
           上下文: {{ memoryTokens }} tokens
         </div>
       </div>
@@ -179,8 +179,8 @@
 
   <!-- 完整响应抽屉 -->
   <el-drawer v-model="drawerVisible" title="完整响应" size="50%">
-    <div style="font-size: 12px; color: #999; margin-bottom: 12px">模型返回的原始 JSON 响应</div>
-    <pre style="background: #f5f5f5; padding: 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: calc(100vh - 200px)">{{ drawerRawResponse }}</pre>
+    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px">模型返回的原始 JSON 响应</div>
+    <pre class="raw-response-pre">{{ drawerRawResponse }}</pre>
   </el-drawer>
 </template>
 
@@ -483,5 +483,65 @@ onMounted(async () => {
 .el-menu-item {
   height: 48px;
   line-height: 48px;
+}
+
+/* ── 深色模式兼容 ── */
+.chat-container {
+  height: calc(100vh - var(--layout-header-height) - 2 * var(--layout-content-padding) - 24px);
+}
+.chat-sidebar {
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+}
+.session-header {
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+}
+.agent-bar {
+  padding: 12px 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-page);
+  padding: 20px;
+}
+.assistant-bubble {
+  max-width: 85%;
+  background: var(--bg-card);
+  padding: 12px 16px;
+  border-radius: 0 12px 12px 12px;
+  word-break: break-word;
+  box-shadow: var(--shadow-sm);
+}
+.thinking-panel {
+  margin-bottom: 8px;
+  background: var(--color-primary-50);
+  border-radius: 6px;
+}
+.input-area {
+  padding: 12px 20px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+}
+.raw-response-pre {
+  background: var(--bg-page);
+  padding: 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: calc(100vh - 200px);
 }
 </style>
