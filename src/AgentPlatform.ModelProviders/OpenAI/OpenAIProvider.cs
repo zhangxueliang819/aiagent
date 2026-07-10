@@ -50,7 +50,7 @@ public class OpenAIProvider : IModelProvider
         var body = new
         {
             model = _modelId,
-            messages = request.Messages.Select(m => new { role = MapRole(m.Role), content = m.Content }).ToArray(),
+            messages = BuildMessageObjects(request.Messages),
             max_tokens = request.MaxTokens,
             temperature = request.Temperature,
             top_p = request.TopP ?? 1,
@@ -69,7 +69,7 @@ public class OpenAIProvider : IModelProvider
         var body = new
         {
             model = _modelId,
-            messages = request.Messages.Select(m => new { role = MapRole(m.Role), content = m.Content }).ToArray(),
+            messages = BuildMessageObjects(request.Messages),
             max_tokens = request.MaxTokens,
             temperature = request.Temperature,
             top_p = request.TopP ?? 1,
@@ -208,6 +208,45 @@ public class OpenAIProvider : IModelProvider
         "tool" => "tool",
         _ => "user"
     };
+
+    /// <summary>
+    /// 构建符合 OpenAI API 规范的消息对象列表（支持 tool_calls 和 tool_call_id）
+    /// </summary>
+    private static IEnumerable<object> BuildMessageObjects(List<ChatMessage> messages)
+    {
+        foreach (var m in messages)
+        {
+            var msg = new Dictionary<string, object?> { ["role"] = MapRole(m.Role) };
+
+            if (m.ToolCalls is { Count: > 0 })
+            {
+                // Assistant 发起 function call——使用 tool_calls 数组，content 设为 null
+                msg["content"] = null;
+                msg["tool_calls"] = m.ToolCalls.Select(tc => new Dictionary<string, object?>
+                {
+                    ["id"] = tc.Id,
+                    ["type"] = "function",
+                    ["function"] = new Dictionary<string, object?>
+                    {
+                        ["name"] = tc.FunctionName,
+                        ["arguments"] = tc.Arguments
+                    }
+                }).ToList();
+            }
+            else
+            {
+                msg["content"] = m.Content;
+            }
+
+            // Tool/function 响应消息需要 tool_call_id
+            if (!string.IsNullOrEmpty(m.ToolCallId))
+            {
+                msg["tool_call_id"] = m.ToolCallId;
+            }
+
+            yield return msg;
+        }
+    }
 
     /// <summary>
     /// 从 SSE data 行提取 delta.content（流式响应的文本增量）

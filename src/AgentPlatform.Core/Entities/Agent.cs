@@ -29,6 +29,12 @@ public class Agent
 
     /// <summary>导航属性：关联的模型端点</summary>
     public ModelEndpoint? ModelEndpoint { get; set; }
+
+    /// <summary>
+    /// MAF Agent 类型标记：ChatClientAgent / HarnessAgent / Custom
+    /// null 表示未启用 MAF 运行时
+    /// </summary>
+    public string? MafAgentType { get; set; }
 }
 
 public enum AgentStatus
@@ -40,4 +46,17 @@ public enum AgentStatus
     Running,
     Paused,
     Stopped
+}
+
+/// <summary>
+/// MAF Agent 运行时类型
+/// </summary>
+public enum MafAgentType
+{
+    /// <summary>标准 ChatClientAgent：基于 IChatClient 的对话型 Agent</summary>
+    ChatClientAgent,
+    /// <summary>电池全配 HarnessAgent：ChatClientAgent + Compaction/Todo/Mode/File 全套能力</summary>
+    HarnessAgent,
+    /// <summary>自定义 Agent：继承 AIAgent 基类</summary>
+    Custom
 }

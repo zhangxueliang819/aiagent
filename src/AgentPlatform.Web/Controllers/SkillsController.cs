@@ -34,6 +34,48 @@ public class SkillsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = s.Id }, new ApiResponse<SkillDto>(true, "Created", s));
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<SkillDto>>> Update(Guid id, [FromBody] UpdateSkillRequest request, CancellationToken ct)
+    {
+        var s = await _service.UpdateAsync(id, request, ct);
+        return Ok(new ApiResponse<SkillDto>(true, "Updated", s));
+    }
+
+    /// <summary>上传技能包（multipart/form-data .zip）</summary>
+    [HttpPost("upload")]
+    [RequestSizeLimit(50_000_000)] // 50 MB
+    public async Task<ActionResult<ApiResponse<SkillUploadResponse>>> Upload(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new ApiResponse<SkillUploadResponse>(false, "请选择要上传的文件", null));
+
+        if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new ApiResponse<SkillUploadResponse>(false, "仅支持 .zip 格式的技能包", null));
+
+        using var stream = file.OpenReadStream();
+        var result = await _service.UploadAsync(stream, file.FileName, ct);
+        return Ok(new ApiResponse<SkillUploadResponse>(true, "上传成功", result));
+    }
+
+    /// <summary>查看技能包内文件列表</summary>
+    [HttpGet("{id:guid}/files")]
+    public ActionResult<ApiResponse<List<SkillFileItem>>> GetFiles(Guid id)
+    {
+        var files = _service.GetFileList(id);
+        return Ok(new ApiResponse<List<SkillFileItem>>(true, "OK", files));
+    }
+
+    /// <summary>下载/预览技能包内单个文件</summary>
+    [HttpGet("{id:guid}/files/{**filePath}")]
+    public ActionResult GetFile(Guid id, string filePath)
+    {
+        var result = _service.GetFileContent(id, filePath);
+        if (result is null)
+            return NotFound(new ApiResponse<object>(false, "File not found", null));
+
+        return File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<object>>> Delete(Guid id, CancellationToken ct)
     {

@@ -13,6 +13,12 @@ public class ModelProvider
     /// <summary>负载均衡策略：RoundRobin / Weighted / LeastConnections</summary>
     public string RoutingStrategy { get; set; } = "RoundRobin";
 
+    /// <summary>
+    /// MAF IChatClient 工厂类型的程序集限定名（如 "MyApp.Providers.MyOpenAIClientFactory, MyApp"）
+    /// 用于 MAF 集成时通过反射创建 IChatClient
+    /// </summary>
+    public string? ClientTypeAssembly { get; set; }
+
     public List<ModelEndpoint> Endpoints { get; set; } = new();
 }
 

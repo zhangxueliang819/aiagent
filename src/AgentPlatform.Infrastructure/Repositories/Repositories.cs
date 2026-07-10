@@ -117,6 +117,9 @@ public class SkillRepository : ISkillRepository
     public async Task<Skill?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _db.Skills.FindAsync([id], ct).AsTask();
 
+    public async Task<List<Skill>> GetByIdsAsync(List<Guid> ids, CancellationToken ct = default)
+        => await _db.Skills.Where(s => ids.Contains(s.Id)).ToListAsync(ct);
+
     public async Task<Skill> AddAsync(Skill skill, CancellationToken ct = default)
     {
         _db.Skills.Add(skill);

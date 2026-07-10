@@ -29,6 +29,7 @@ public interface ISkillRepository
 {
     Task<List<Skill>> GetAllAsync(CancellationToken ct = default);
     Task<Skill?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<List<Skill>> GetByIdsAsync(List<Guid> ids, CancellationToken ct = default);
     Task<Skill> AddAsync(Skill skill, CancellationToken ct = default);
     Task<Skill> UpdateAsync(Skill skill, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);

@@ -42,10 +42,27 @@ public record CreateModelEndpointRequest(
     decimal InputPricePer1K = 0, decimal OutputPricePer1K = 0,
     int Weight = 1, int RpmLimit = 0, int TpmLimit = 0);
 
-public record SkillDto(Guid Id, string Name, string Description, string Type,
-    string InputSchema, bool IsEnabled, DateTime CreatedAt);
+public record SkillDto(
+    Guid Id, string Name, string Description, string Type,
+    string Implementation, string InputSchema, bool IsEnabled,
+    string StorageType, string? StoragePath, string? OriginalFileName, string? FileManifest,
+    DateTime CreatedAt, DateTime UpdatedAt);
 
-public record CreateSkillRequest(string Name, string Description, string Type, string Implementation, string InputSchema);
+public record CreateSkillRequest(
+    string Name, string Description, string Type,
+    string Implementation, string InputSchema,
+    string? StorageType = null);
+
+public record UpdateSkillRequest(
+    string? Name, string? Description, string? Type,
+    string? Implementation, string? InputSchema,
+    bool? IsEnabled);
+
+/// <summary>技能包内文件项</summary>
+public record SkillFileItem(string Path, long Size, DateTime LastModified);
+
+/// <summary>上传技能包响应</summary>
+public record SkillUploadResponse(SkillDto Skill, List<SkillFileItem> Files);
 
 public record SessionDto(Guid Id, string Title, Guid AgentId, string Status,
     DateTime CreatedAt, List<ConversationDto> Conversations);

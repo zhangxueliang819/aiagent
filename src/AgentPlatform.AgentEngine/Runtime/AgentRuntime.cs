@@ -147,9 +147,23 @@ public class AgentRuntime
                 Result = toolResult
             });
 
-            // 将 function_call 结果添加到消息历史
-            messages.Add(new ChatMessage { Role = "assistant", Content = response.Content });
-            messages.Add(new ChatMessage { Role = "function", Content = toolResult });
+            // 将 function_call 结果添加到消息历史（符合 OpenAI tool_calls 格式）
+            var toolCallId = $"call_{Guid.NewGuid():N}";
+            messages.Add(new ChatMessage
+            {
+                Role = "assistant",
+                Content = response.Content,
+                ToolCalls = new List<ToolCall>
+                {
+                    new() { Id = toolCallId, FunctionName = functionName!, Arguments = functionArgs ?? "{}" }
+                }
+            });
+            messages.Add(new ChatMessage
+            {
+                Role = "function",
+                Content = toolResult,
+                ToolCallId = toolCallId
+            });
 
             _logger.LogInformation("Tool result length: {Length} chars", toolResult.Length);
         }
