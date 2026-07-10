@@ -181,6 +181,18 @@
 
 /* ── 元素级深色覆盖 (必须用 .dark .el-* 绕过 EP 的元素级变量) ─ */
 
+.dark .el-table__cell {
+  color: var(--text-primary) !important;
+}
+
+.dark .el-table__header-wrapper .el-table__cell {
+  color: var(--text-primary) !important;
+}
+
+.dark .el-table__body-wrapper .el-table__cell {
+  color: var(--text-primary) !important;
+}
+
 .dark .el-button--default {
   --el-button-bg-color: #3c3c3c;
   --el-button-border-color: #3c3c3c;

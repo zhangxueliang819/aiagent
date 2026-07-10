@@ -1,5 +1,5 @@
 <template>
-  <div class="usage-page">
+  <div>
     <!-- 顶部筛选栏 -->
     <el-card shadow="never" class="filter-card">
       <el-row :gutter="16" align="middle">
@@ -294,9 +294,6 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.usage-page {
-  padding: var(--layout-content-padding);
-}
 .filter-card {
   margin-bottom: 16px;
 }

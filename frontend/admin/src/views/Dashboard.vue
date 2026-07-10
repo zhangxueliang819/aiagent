@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container" style="padding-top: 0">
+  <div>
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="mb-lg">
       <el-col :xs="12" :sm="12" :md="6" v-for="card in statCards" :key="card.label">
