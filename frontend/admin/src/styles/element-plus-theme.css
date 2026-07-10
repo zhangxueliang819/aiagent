@@ -87,7 +87,7 @@
   --el-z-index-notification: var(--z-index-notification);
 }
 
-/* ── Element Plus 深色适配 ────────────────────────── */
+/* ── Element Plus 深色适配 (VS Code 风格) ───── */
 .dark {
   --el-bg-color: var(--bg-page);
   --el-bg-color-page: var(--bg-page);
@@ -102,15 +102,15 @@
   --el-text-color-regular: var(--text-secondary);
   --el-text-color-secondary: var(--text-muted);
   --el-text-color-placeholder: var(--text-muted);
-  --el-text-color-disabled: var(--color-gray-500);
+  --el-text-color-disabled: var(--color-gray-600);
 
   --el-border-color: var(--border-color);
   --el-border-color-light: var(--border-light);
   --el-border-color-lighter: var(--color-gray-200);
 
-  --el-fill-color: var(--color-gray-200);
-  --el-fill-color-light: var(--color-gray-100);
-  --el-fill-color-lighter: #1a1a1a;
+  --el-fill-color: #3c3c3c;
+  --el-fill-color-light: #333333;
+  --el-fill-color-lighter: #2d2d2d;
   --el-fill-color-blank: var(--bg-card);
 
   --el-mask-color: rgba(0,0,0,0.6);
@@ -120,7 +120,7 @@
   --el-menu-hover-bg-color: transparent;
   --el-menu-active-color: var(--sidebar-active-text);
   --el-menu-text-color: var(--sidebar-text);
-  --el-menu-hover-text-color: #ffffff;
+  --el-menu-hover-text-color: var(--sidebar-active-text);
 
   /* el-card */
   --el-card-bg-color: var(--bg-card);
@@ -129,15 +129,142 @@
   /* el-table */
   --el-table-bg-color: var(--bg-card);
   --el-table-tr-bg-color: var(--bg-card);
-  --el-table-header-bg-color: var(--color-gray-100);
+  --el-table-header-bg-color: #2a2d2e;
   --el-table-border-color: var(--border-light);
-  --el-table-row-hover-bg-color: var(--color-gray-200);
+  --el-table-row-hover-bg-color: #2a2d2e;
+  --el-table-text-color: var(--text-primary);
+  --el-table-header-text-color: var(--text-primary);
 
   /* el-dialog */
   --el-dialog-bg-color: var(--bg-card);
 
   /* el-header / el-aside */
   --el-header-bg-color: var(--bg-header);
+
+  /* el-input / el-select 等 */
+  --el-input-bg-color: #3c3c3c;
+  --el-input-border-color: var(--border-color);
+  --el-input-hover-border-color: var(--color-primary-400);
+  --el-input-focus-border-color: var(--color-primary-500);
+  --el-input-placeholder-color: var(--color-gray-600);
+
+  /* el-button 移到元素级 .dark .el-button--default */
+
+  /* el-tag */
+  --el-tag-bg-color: #2d2d2d;
+  --el-tag-border-color: #3c3c3c;
+
+  /* el-select-dropdown / el-dropdown */
+  --el-select-dropdown-bg-color: #252526;
+  --el-select-dropdown-border-color: #3c3c3c;
+
+  /* el-pagination */
+  --el-pagination-button-bg-color: #3c3c3c;
+  --el-pagination-hover-color: var(--color-primary-400);
+
+  /* el-empty */
+  --el-empty-fill-color-0: #333333;
+  --el-empty-fill-color-1: #3c3c3c;
+  --el-empty-fill-color-2: #2d2d2d;
+
+  /* el-notification / el-message-box */
+  --el-notification-bg-color: #252526;
+  --el-messagebox-bg-color: #252526;
+
+  /* el-switch */
+  --el-switch-off-color: #3c3c3c;
+
+  /* el-checkbox */
+  --el-checkbox-checked-bg-color: var(--color-primary-500);
+  --el-checkbox-input-border-color-hover: var(--color-primary-400);
+}
+
+/* ── 元素级深色覆盖 (必须用 .dark .el-* 绕过 EP 的元素级变量) ─ */
+
+.dark .el-button--default {
+  --el-button-bg-color: #3c3c3c;
+  --el-button-border-color: #3c3c3c;
+  --el-button-text-color: var(--text-primary);
+  --el-button-hover-bg-color: #4a4a4a;
+  --el-button-hover-border-color: #4a4a4a;
+  --el-button-active-bg-color: #555555;
+  --el-button-active-border-color: #555555;
+}
+
+.dark .el-tag {
+  --el-tag-text-color: var(--text-primary);
+}
+
+.dark .el-tabs--border-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+.dark .el-tabs--border-card > .el-tabs__header {
+  background: #2a2d2e;
+  border-bottom-color: var(--border-color);
+}
+.dark .el-tabs--border-card > .el-tabs__header .el-tabs__item {
+  color: var(--text-secondary);
+}
+.dark .el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  border-bottom-color: var(--bg-card);
+}
+
+.dark .el-collapse-item__header {
+  color: var(--text-primary);
+}
+.dark .el-collapse-item__wrap {
+  background: var(--bg-card);
+  border-bottom-color: var(--border-color);
+}
+
+.dark .el-form-item__label {
+  color: var(--text-secondary);
+}
+
+.dark .el-dialog__title {
+  color: var(--text-primary);
+}
+.dark .el-dialog__body {
+  color: var(--text-primary);
+}
+
+.dark .el-descriptions__title {
+  color: var(--text-primary);
+}
+.dark .el-descriptions__label {
+  color: var(--text-secondary);
+}
+.dark .el-descriptions__content {
+  color: var(--text-primary);
+}
+
+.dark .el-empty__description p {
+  color: var(--text-secondary);
+}
+
+.dark .el-pagination {
+  --el-pagination-text-color: var(--text-primary);
+}
+.dark .el-pagination button {
+  color: var(--text-primary);
+}
+
+.dark .el-switch__label {
+  color: var(--text-secondary);
+}
+.dark .el-switch__label.is-active {
+  color: var(--text-primary);
+}
+
+.dark .el-link {
+  --el-link-text-color: var(--color-primary-400);
+}
+.dark .el-link.el-link--default {
+  color: var(--text-primary);
 }
 :root {
   --el-color-primary: var(--color-primary-500);

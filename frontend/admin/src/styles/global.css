@@ -60,6 +60,24 @@ a:hover {
   color: var(--color-primary-900);
 }
 
+/* ── 深色模式全局覆盖 (VS Code 风格) ────────── */
+.dark ::selection {
+  background: #264f78 !important;
+  color: #ffffff !important;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #424242 !important;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #555555 !important;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
 [disabled] {
   cursor: not-allowed;
 }

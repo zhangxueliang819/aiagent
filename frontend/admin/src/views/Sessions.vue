@@ -70,10 +70,10 @@
             >
               {{ msg.role === 'user' ? '用户' : msg.role === 'assistant' ? '助手' : msg.role }}
             </el-tag>
-            <span style="font-size: 12px; color: #999">
+            <span style="font-size: 12px; color: var(--text-muted)">
               {{ new Date(msg.createdAt).toLocaleTimeString() }}
             </span>
-            <span v-if="msg.tokenCount" style="font-size: 11px; color: #bbb; margin-left: auto">
+            <span v-if="msg.tokenCount" style="font-size: 11px; color: var(--text-secondary); margin-left: auto">
               {{ msg.tokenCount }} tokens
             </span>
           </div>
@@ -92,7 +92,7 @@
           </div>
         </div>
       </div>
-      <div v-else style="text-align: center; padding: 40px; color: #999">
+      <div v-else style="text-align: center; padding: 40px; color: var(--text-muted)">
         暂无对话记录
       </div>
     </el-dialog>

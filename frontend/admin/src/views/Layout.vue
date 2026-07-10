@@ -265,4 +265,13 @@ async function handleLogout() {
 :deep(.el-drawer__body) {
   padding: 0;
 }
+
+/* ── 深色模式辅助 ──────────────────────────── */
+.dark .collapse-btn {
+  border-top-color: #3c3c3c;
+}
+
+.dark .header-title {
+  color: #e8e8e8;
+}
 </style>
