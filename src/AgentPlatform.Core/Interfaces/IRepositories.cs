@@ -42,6 +42,7 @@ public interface ISessionRepository
     Task<Session> AddAsync(Session session, CancellationToken ct = default);
     Task<Conversation> AddConversationAsync(Conversation conversation, CancellationToken ct = default);
     Task UpdateAsync(Session session, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task<List<Session>> GetActiveSessionsOlderThanAsync(DateTime threshold, CancellationToken ct = default);
 }
 

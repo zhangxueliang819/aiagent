@@ -177,6 +177,14 @@ public class SessionRepository : ISessionRepository
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var session = await _db.Sessions.Include(s => s.Conversations).FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (session is null) return;
+        _db.Sessions.Remove(session);
+        await _db.SaveChangesAsync(ct);
+    }
+
     public async Task<List<Session>> GetActiveSessionsOlderThanAsync(DateTime threshold, CancellationToken ct = default)
         => await _db.Sessions
             .Where(s => s.Status == Core.Entities.SessionStatus.Active && s.UpdatedAt < threshold)

@@ -87,8 +87,8 @@
                   <pre style="white-space: pre-wrap; font-size: 12px; color: var(--text-secondary); line-height: 1.6; max-height: 300px; overflow-y: auto; margin: 0">{{ msg.thinking }}</pre>
                 </el-collapse-item>
               </el-collapse>
-              <div v-if="msg.isStreaming" style="font-style: italic; color: var(--text-muted)">正在输入...</div>
-              <div v-else style="white-space: pre-wrap">{{ msg.content }}</div>
+              <div v-if="msg.content" style="white-space: pre-wrap">{{ msg.content }}</div>
+              <div v-else-if="msg.isStreaming" style="font-style: italic; color: var(--text-muted)">正在思考...</div>
               <!-- 模型元信息 -->
               <div v-if="!msg.isStreaming && msg.modelName" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap">
                 <span>模型: {{ msg.modelName }}</span>
@@ -392,7 +392,6 @@ async function sendMessage() {
             case 'token':
               fullContent += data.content
               assistantMsg.content = fullContent
-              assistantMsg.isStreaming = false
               break
 
             case 'thinking':

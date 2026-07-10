@@ -256,11 +256,21 @@ public class AgentRuntimeFactory
                 };
             }
 
-            // 逐字符模拟流式输出（降级模式）
+            // 提取思考过程（DeepSeek-R1 等模型在非流式响应中返回 reasoning_content）
+            if (response.AdditionalProperties?.TryGetValue("thinking", out var thinkObj) == true
+                && thinkObj is string thinkStr && !string.IsNullOrEmpty(thinkStr))
+            {
+                fullThinking = thinkStr;
+                yield return new StreamingDelta { Type = StreamDeltaType.Thinking, Thinking = thinkStr };
+            }
+
+            // 逐字符模拟流式输出（降级模式，添加延迟以支持前端逐字渲染）
             foreach (var ch in text)
             {
                 fullContent += ch.ToString();
                 yield return new StreamingDelta { Type = StreamDeltaType.Token, Content = ch.ToString() };
+                // 小延迟让前端有时间逐字渲染（流式效果）
+                await Task.Delay(10, ct);
             }
 
             modelName ??= response.ModelId;

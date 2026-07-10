@@ -37,6 +37,12 @@ public class SessionService
         return Map(await _repository.AddAsync(session, ct));
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await _repository.DeleteAsync(id, ct);
+        return true;
+    }
+
     private static SessionDto Map(Session s) => new(
         s.Id, s.Title, s.AgentId, s.Status.ToString(),
         s.CreatedAt,

@@ -173,11 +173,14 @@ public class OpenAIProvider : IChatClient
         var choices = root.GetProperty("choices");
         var firstChoice = choices[0];
         var message = firstChoice.GetProperty("message");
-        var content = message.TryGetProperty("content", out var contentProp) ? contentProp.GetString() ?? "" : "";
+        var content = message.TryGetProperty("content", out var contentProp)
+            && contentProp.ValueKind != JsonValueKind.Null
+            ? contentProp.GetString() ?? "" : "";
 
         // 解析推理/思考内容（DeepSeek-R1 等模型支持）
         string? thinking = null;
-        if (message.TryGetProperty("reasoning_content", out var reasoningProp))
+        if (message.TryGetProperty("reasoning_content", out var reasoningProp)
+            && reasoningProp.ValueKind != JsonValueKind.Null)
             thinking = reasoningProp.GetString();
 
         int inputTokens = 0, outputTokens = 0;
@@ -303,11 +306,13 @@ public class OpenAIProvider : IChatClient
             if (!first.TryGetProperty("delta", out var delta)) return (null, null);
 
             string? content = null;
-            if (delta.TryGetProperty("content", out var contentProp))
+            if (delta.TryGetProperty("content", out var contentProp)
+                && contentProp.ValueKind != JsonValueKind.Null)
                 content = contentProp.GetString();
 
             string? reasoning = null;
-            if (delta.TryGetProperty("reasoning_content", out var reasoningProp))
+            if (delta.TryGetProperty("reasoning_content", out var reasoningProp)
+                && reasoningProp.ValueKind != JsonValueKind.Null)
                 reasoning = reasoningProp.GetString();
 
             return (content, reasoning);

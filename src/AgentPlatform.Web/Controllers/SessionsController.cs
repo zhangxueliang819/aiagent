@@ -33,6 +33,13 @@ public class SessionsController : ControllerBase
         var s = await _service.CreateAsync(request.UserId, request.AgentId, request.Title, ct);
         return CreatedAtAction(nameof(GetById), new { id = s.Id }, new ApiResponse<SessionDto>(true, "Created", s));
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(Guid id, CancellationToken ct)
+    {
+        var result = await _service.DeleteAsync(id, ct);
+        return Ok(new ApiResponse<bool>(true, "Deleted", result));
+    }
 }
 
 public record CreateSessionRequest(string UserId, Guid AgentId, string Title);
