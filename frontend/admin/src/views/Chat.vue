@@ -487,7 +487,7 @@ onMounted(async () => {
 
 /* ── 深色模式兼容 ── */
 .chat-container {
-  height: calc(100vh - var(--layout-header-height) - 2 * var(--layout-content-padding) - 24px);
+  height: calc(100vh - var(--layout-header-height) - 2 * var(--layout-content-padding));
 }
 .chat-sidebar {
   background: var(--bg-card);
@@ -529,7 +529,7 @@ onMounted(async () => {
   border-radius: 6px;
 }
 .input-area {
-  padding: 12px 20px;
+  padding: 12px 20px 8px;
   background: var(--bg-card);
   border-top: 1px solid var(--border-color);
 }

@@ -18,10 +18,10 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" class="mb-lg">
+    <el-row :gutter="16" class="mb-lg equal-height-row">
       <!-- 系统状态 -->
-      <el-col :xs="24" :md="12" class="mb-md">
-        <el-card shadow="hover">
+      <el-col :xs="24" :md="12">
+        <el-card shadow="hover" class="equal-height-card">
           <template #header>
             <div class="flex items-center justify-between">
               <span style="font-weight: 600">系统状态</span>
@@ -39,8 +39,35 @@
         </el-card>
       </el-col>
 
-      <!-- 最近会话 -->
-      <el-col :xs="24" :md="12" class="mb-md">
+      <!-- 用量概览 -->
+      <el-col :xs="24" :md="12">
+        <el-card shadow="hover" class="equal-height-card">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span style="font-weight: 600">用量概览</span>
+              <el-button size="small" text @click="$router.push('/usage')">查看更多 →</el-button>
+            </div>
+          </template>
+          <el-table :data="usageRecords" size="small" v-loading="usageLoading">
+            <el-table-column prop="modelId" label="模型" min-width="100" show-overflow-tooltip />
+            <el-table-column label="输入 Token" width="90" align="right">
+              <template #default="{ row }">{{ row.inputTokens.toLocaleString() }}</template>
+            </el-table-column>
+            <el-table-column label="输出 Token" width="90" align="right">
+              <template #default="{ row }">{{ row.outputTokens.toLocaleString() }}</template>
+            </el-table-column>
+            <el-table-column label="费用" width="80" align="right">
+              <template #default="{ row }">${{ row.cost.toFixed(4) }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!usageLoading && usageRecords.length === 0" description="暂无用量数据" :image-size="40" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 最近会话（独占一行） -->
+    <el-row :gutter="16" class="mb-lg">
+      <el-col :span="24">
         <el-card shadow="hover">
           <template #header>
             <div class="flex items-center justify-between">
@@ -51,18 +78,20 @@
           <div v-if="recentSessions.length === 0" class="text-center text-secondary" style="padding: 24px 0">
             <el-empty description="暂无会话" :image-size="48" />
           </div>
-          <div v-else v-for="s in recentSessions" :key="s.id" class="recent-session-item">
-            <div class="flex items-center justify-between" style="cursor: pointer" @click="$router.push('/chat')">
-              <div class="flex items-center gap-sm" style="flex: 1; min-width: 0">
-                <el-icon :size="16" style="color: #909399"><ChatDotSquare /></el-icon>
-                <span class="text-ellipsis">{{ s.title || '新会话' }}</span>
+          <div v-else style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px">
+            <div v-for="s in recentSessions" :key="s.id" class="recent-session-item" style="cursor: pointer" @click="$router.push('/chat')">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-sm" style="flex: 1; min-width: 0">
+                  <el-icon :size="16" style="color: #909399"><ChatDotSquare /></el-icon>
+                  <span class="text-ellipsis">{{ s.title || '新会话' }}</span>
+                </div>
+                <el-tag
+                  :type="s.status === 'Active' ? 'success' : 'info'"
+                  size="small"
+                >
+                  {{ s.status === 'Active' ? '活跃' : '完成' }}
+                </el-tag>
               </div>
-              <el-tag
-                :type="s.status === 'Active' ? 'success' : 'info'"
-                size="small"
-              >
-                {{ s.status === 'Active' ? '活跃' : '完成' }}
-              </el-tag>
             </div>
           </div>
         </el-card>
@@ -119,6 +148,8 @@ const skillStore = useSkillStore()
 
 const startTime = ref(new Date().toLocaleString())
 const recentSessions = ref<any[]>([])
+const usageRecords = ref<any[]>([])
+const usageLoading = ref(false)
 
 interface StatCard {
   label: string
@@ -153,31 +184,59 @@ async function loadRecentSessions() {
   } catch { /* ignore */ }
 }
 
+async function loadUsage() {
+  usageLoading.value = true
+  try {
+    const from = new Date()
+    from.setDate(from.getDate() - 7)
+    const params = { from: from.toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) }
+    const res = await http.get('/usage', { params })
+    const data = res.data.data || res.data || []
+    usageRecords.value = (Array.isArray(data) ? data : []).slice(0, 1)
+  } catch { /* ignore */ }
+  finally { usageLoading.value = false }
+}
+
 function refreshStats() {
   loadStats()
   loadRecentSessions()
+  loadUsage()
 }
 
 onMounted(() => {
   loadStats()
   loadRecentSessions()
+  loadUsage()
 })
 </script>
 
 <style scoped>
-.recent-session-item {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-light);
-  transition: border-color var(--transition-normal);
+.equal-height-row {
+  display: flex;
+  flex-wrap: wrap;
 }
-.recent-session-item:last-child {
-  border-bottom: none;
+.equal-height-row > .el-col {
+  display: flex;
+}
+.equal-height-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.equal-height-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.recent-session-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  transition: box-shadow 0.2s, border-color var(--transition-normal);
 }
 .recent-session-item:hover {
-  background: var(--sidebar-hover-bg);
-  margin: 0 -8px;
-  padding: 8px;
-  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-300);
 }
 .text-ellipsis {
   overflow: hidden;

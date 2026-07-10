@@ -193,6 +193,17 @@
   color: var(--text-primary) !important;
 }
 
+.dark .el-table__fixed,
+.dark .el-table__fixed-right {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .el-table__fixed .el-table__cell,
+.dark .el-table__fixed-right .el-table__cell {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-card) !important;
+}
+
 .dark .el-button--default {
   --el-button-bg-color: #3c3c3c;
   --el-button-border-color: #3c3c3c;
