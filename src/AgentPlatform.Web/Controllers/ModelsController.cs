@@ -96,4 +96,16 @@ public class ModelsController : ControllerBase
         _router.InvalidateCache(endpointId);
         return Ok(new ApiResponse<object>(true, "Cache cleared", null));
     }
+
+    /// <summary>
+    /// 测试模型提供商的连接是否正常
+    /// </summary>
+    [HttpPost("{id:guid}/test")]
+    public async Task<ActionResult<ApiResponse<object>>> TestConnection(Guid id, CancellationToken ct)
+    {
+        var (success, message) = await _service.TestConnectionAsync(id, ct);
+        return success
+            ? Ok(new ApiResponse<object>(true, message, null))
+            : BadRequest(new ApiResponse<object>(false, message, null));
+    }
 }

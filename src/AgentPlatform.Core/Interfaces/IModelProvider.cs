@@ -28,6 +28,10 @@ public class ChatCompletionResponse
     public string Id { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    /// <summary>模型的推理/思考过程（如 DeepSeek-R1 的 reasoning_content）</summary>
+    public string? Thinking { get; set; }
+    /// <summary>LLM 返回的原始 JSON 响应</summary>
+    public string? RawResponse { get; set; }
     public int InputTokens { get; set; }
     public int OutputTokens { get; set; }
 }

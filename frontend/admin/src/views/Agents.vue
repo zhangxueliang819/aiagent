@@ -78,24 +78,22 @@
         </el-form-item>
         <el-form-item label="创建者"><el-input v-model="form.createdBy" /></el-form-item>
         <el-collapse style="margin-top: 8px">
-          <el-collapse-item title="LLM 参数（可选，留空使用模型默认值）" name="llm">
+          <el-collapse-item title="LLM 参数（留空使用模型默认值）" name="llm">
             <el-row :gutter="16">
-              <el-col :span="8">
+              <el-col :span="12">
                 <el-form-item label="Temperature">
-                  <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+                  <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input />
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :span="12">
                 <el-form-item label="MaxTokens">
                   <el-input-number v-model="form.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
-                <el-form-item label="TopP">
-                  <el-slider v-model="form.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
-                </el-form-item>
-              </el-col>
             </el-row>
+            <el-form-item label="TopP">
+              <el-slider v-model="form.topP" :min="0" :max="1" :step="0.05" show-input />
+            </el-form-item>
           </el-collapse-item>
         </el-collapse>
         <el-form-item style="margin-top: 8px; margin-bottom: 0">
@@ -135,22 +133,20 @@
             <el-collapse style="margin-top: 8px">
               <el-collapse-item title="LLM 参数（留空使用模型默认值）" name="llm-edit">
                 <el-row :gutter="16">
-                  <el-col :span="8">
+                  <el-col :span="12">
                     <el-form-item label="Temperature">
-                      <el-slider v-model="editForm.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+                      <el-slider v-model="editForm.temperature" :min="0" :max="2" :step="0.1" show-input />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
+                  <el-col :span="12">
                     <el-form-item label="MaxTokens">
                       <el-input-number v-model="editForm.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
-                    <el-form-item label="TopP">
-                      <el-slider v-model="editForm.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
-                    </el-form-item>
-                  </el-col>
                 </el-row>
+                <el-form-item label="TopP">
+                  <el-slider v-model="editForm.topP" :min="0" :max="1" :step="0.05" show-input />
+                </el-form-item>
               </el-collapse-item>
             </el-collapse>
           </el-form>

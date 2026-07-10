@@ -84,6 +84,11 @@ public class AgentRuntime
         // 对话循环
         int toolCallCount = 0;
         string? finalContent = null;
+        var toolCalls = new List<ToolCallInfo>();
+        string? thinking = null;
+        string? rawResponse = null;
+        string? modelName = null;
+        int totalInputTokens = 0, totalOutputTokens = 0;
 
         while (toolCallCount < MaxToolCalls)
         {
@@ -99,6 +104,18 @@ public class AgentRuntime
             var response = await llm.CompleteAsync(request, ct);
             _logger.LogInformation("LLM response received, tokens: {Input}/{Output}",
                 response.InputTokens, response.OutputTokens);
+
+            // 累计 Token
+            totalInputTokens += response.InputTokens;
+            totalOutputTokens += response.OutputTokens;
+
+            // 收集模型信息
+            modelName ??= response.Model;
+            rawResponse ??= response.RawResponse;
+
+            // 收集推理/思考过程（仅首次）
+            if (thinking is null && !string.IsNullOrEmpty(response.Thinking))
+                thinking = response.Thinking;
 
             // 尝试解析 function_call
             var (isFunctionCall, functionName, functionArgs) = TryParseFunctionCall(response.Content);
@@ -122,6 +139,14 @@ public class AgentRuntime
                 mcpInvokers,
                 ct);
 
+            // 记录工具调用详情
+            toolCalls.Add(new ToolCallInfo
+            {
+                Name = functionName ?? "",
+                Arguments = functionArgs ?? "{}",
+                Result = toolResult
+            });
+
             // 将 function_call 结果添加到消息历史
             messages.Add(new ChatMessage { Role = "assistant", Content = response.Content });
             messages.Add(new ChatMessage { Role = "function", Content = toolResult });
@@ -140,7 +165,13 @@ public class AgentRuntime
         return new AgentResponse
         {
             Content = finalContent,
-            ToolCallCount = toolCallCount
+            ToolCallCount = toolCallCount,
+            Thinking = thinking,
+            RawResponse = rawResponse,
+            ModelName = modelName,
+            InputTokens = totalInputTokens,
+            OutputTokens = totalOutputTokens,
+            ToolCalls = toolCalls
         };
     }
 
@@ -243,4 +274,23 @@ public class AgentResponse
 {
     public string Content { get; set; } = string.Empty;
     public int ToolCallCount { get; set; }
+    /// <summary>模型的推理/思考过程</summary>
+    public string? Thinking { get; set; }
+    /// <summary>LLM 返回的原始 JSON 响应</summary>
+    public string? RawResponse { get; set; }
+    /// <summary>使用的模型名称</summary>
+    public string? ModelName { get; set; }
+    /// <summary>输入 Token 数</summary>
+    public int InputTokens { get; set; }
+    /// <summary>输出 Token 数</summary>
+    public int OutputTokens { get; set; }
+    /// <summary>工具调用详情</summary>
+    public List<ToolCallInfo> ToolCalls { get; set; } = new();
+}
+
+public class ToolCallInfo
+{
+    public string Name { get; set; } = string.Empty;
+    public string Arguments { get; set; } = "{}";
+    public string? Result { get; set; }
 }

@@ -2,11 +2,14 @@
   <el-container style="height: calc(100vh - 120px)">
     <!-- 左侧：会话列表 -->
     <el-aside width="260px" style="background: #fff; border-right: 1px solid #e6e6e6; overflow-y: auto">
-      <div style="padding: 12px; display: flex; flex-direction: column; gap: 8px">
+      <div style="padding: 12px">
         <el-button type="primary" style="width: 100%" @click="createNewSession" :icon="Plus">
           新建会话
         </el-button>
-        <el-button style="width: 100%" @click="handleClearMessages" :disabled="messages.length === 0" :icon="Delete">
+      </div>
+      <div style="padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f0f0f0">
+        <span style="font-size: 13px; font-weight: 600; color: #303133">会话列表</span>
+        <el-button text size="small" :icon="Delete" @click="handleClearMessages" :disabled="messages.length === 0" style="color: #909399">
           清空消息
         </el-button>
       </div>
@@ -37,6 +40,29 @@
 
     <!-- 右侧：对话区域 -->
     <el-container style="flex-direction: column">
+      <!-- 顶部：Agent 选择栏 -->
+      <div style="padding: 12px 20px; background: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; gap: 12px">
+        <span style="font-size: 14px; color: #606266; white-space: nowrap">当前 Agent：</span>
+        <el-select
+          v-model="selectedAgentId"
+          placeholder="选择 Agent"
+          size="default"
+          filterable
+          @change="onAgentChange"
+          :disabled="isStreaming"
+          style="width: 220px"
+        >
+          <el-option
+            v-for="a in agents"
+            :key="a.id"
+            :label="a.name"
+            :value="a.id"
+          >
+            <span>{{ a.name }}</span>
+          </el-option>
+        </el-select>
+      </div>
+
       <!-- 消息列表 -->
       <el-main style="flex: 1; overflow-y: auto; background: #f5f5f5; padding: 20px">
         <div v-if="messages.length === 0" style="text-align: center; padding-top: 100px; color: #999">
@@ -55,8 +81,20 @@
           <!-- 助手消息 -->
           <div v-else-if="msg.role === 'assistant'" style="display: flex; justify-content: flex-start; flex-direction: column">
             <div style="max-width: 85%; background: #fff; padding: 12px 16px; border-radius: 0 12px 12px 12px; word-break: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05)">
+              <!-- 思考过程折叠面板 -->
+              <el-collapse v-if="msg.thinking" style="margin-bottom: 8px; background: #f8f9fa; border-radius: 6px" :model-value="['thinking']">
+                <el-collapse-item title="🤔 思考过程" name="thinking">
+                  <pre style="white-space: pre-wrap; font-size: 12px; color: #555; line-height: 1.6; max-height: 300px; overflow-y: auto; margin: 0">{{ msg.thinking }}</pre>
+                </el-collapse-item>
+              </el-collapse>
               <div v-if="msg.isStreaming" style="font-style: italic; color: #999">正在输入...</div>
               <div v-else style="white-space: pre-wrap">{{ msg.content }}</div>
+              <!-- 模型元信息 -->
+              <div v-if="!msg.isStreaming && msg.modelName" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; font-size: 11px; color: #999; display: flex; gap: 16px; flex-wrap: wrap">
+                <span>模型: {{ msg.modelName }}</span>
+                <span v-if="msg.inputTokens != null">输入: {{ msg.inputTokens }} tokens</span>
+                <span v-if="msg.outputTokens != null">输出: {{ msg.outputTokens }} tokens</span>
+              </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; margin-left: 4px">
               <span v-if="msg.tokenCount" style="font-size: 11px; color: #bbb">
@@ -68,6 +106,7 @@
                   v-if="idx === messages.length - 1"
                   size="small" text :icon="Refresh" @click="regenerateLast"
                 >重新生成</el-button>
+                <el-button v-if="msg.rawResponse" size="small" text :icon="View" @click="showRawResponse(msg)">完整响应</el-button>
               </template>
             </div>
           </div>
@@ -107,27 +146,6 @@
       <!-- 输入区域 -->
       <div style="padding: 12px 20px; background: #fff; border-top: 1px solid #e6e6e6">
         <div style="display: flex; align-items: flex-end; gap: 8px">
-          <!-- Agent 选择器 -->
-          <div style="min-width: 160px">
-            <el-select
-              v-model="selectedAgentId"
-              placeholder="选择 Agent"
-              size="default"
-              filterable
-              @change="onAgentChange"
-              :disabled="isStreaming"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="a in agents"
-                :key="a.id"
-                :label="a.name"
-                :value="a.id"
-              >
-                <span>{{ a.name }}</span>
-              </el-option>
-            </el-select>
-          </div>
           <div style="flex: 1; position: relative">
             <el-input
               v-model="inputMessage"
@@ -158,11 +176,17 @@
       </div>
     </el-container>
   </el-container>
+
+  <!-- 完整响应抽屉 -->
+  <el-drawer v-model="drawerVisible" title="完整响应" size="50%">
+    <div style="font-size: 12px; color: #999; margin-bottom: 12px">模型返回的原始 JSON 响应</div>
+    <pre style="background: #f5f5f5; padding: 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: calc(100vh - 200px)">{{ drawerRawResponse }}</pre>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Plus, Promotion, ChatDotSquare, Loading, Tools, Delete, CopyDocument, Refresh } from '@element-plus/icons-vue'
+import { Plus, Promotion, ChatDotSquare, Loading, Tools, Delete, CopyDocument, Refresh, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
@@ -172,6 +196,11 @@ interface ChatMessage {
   isStreaming?: boolean
   tokenCount?: number
   toolCalls?: ToolCall[]
+  thinking?: string
+  modelName?: string
+  inputTokens?: number
+  outputTokens?: number
+  rawResponse?: string
 }
 
 interface ToolCall {
@@ -201,6 +230,8 @@ const memoryTokens = ref(0)
 const agents = ref<AgentInfo[]>([])
 const currentAgent = ref<AgentInfo | null>(null)
 const selectedAgentId = ref<string>('')
+const drawerVisible = ref(false)
+const drawerRawResponse = ref('')
 
 // 新建会话
 async function createNewSession() {
@@ -288,6 +319,11 @@ function regenerateLast() {
   }
 }
 
+function showRawResponse(msg: ChatMessage) {
+  drawerRawResponse.value = msg.rawResponse || ''
+  drawerVisible.value = true
+}
+
 // 发送消息（使用 SSE 流式端点）
 async function sendMessage() {
   const content = inputMessage.value.trim()
@@ -359,6 +395,10 @@ async function sendMessage() {
               assistantMsg.isStreaming = false
               break
 
+            case 'thinking':
+              assistantMsg.thinking = data.content
+              break
+
             case 'tool_call':
               assistantMsg.toolCalls = assistantMsg.toolCalls || []
               assistantMsg.toolCalls.push({
@@ -372,6 +412,10 @@ async function sendMessage() {
               finalToolCount = data.toolCallCount
               finalMemTokens = data.memoryTokens
               memoryTokens.value = finalMemTokens
+              assistantMsg.modelName = data.modelName
+              assistantMsg.inputTokens = data.inputTokens
+              assistantMsg.outputTokens = data.outputTokens
+              assistantMsg.rawResponse = data.rawResponse
               if (!assistantMsg.content && assistantMsg.toolCalls?.length) {
                 assistantMsg.content = `完成 ${assistantMsg.toolCalls.length} 次工具调用`
               }

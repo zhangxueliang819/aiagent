@@ -60,6 +60,7 @@ public class SimulatedModelProvider : IModelProvider
                     Id = Guid.NewGuid().ToString(),
                     Model = "simulated",
                     Content = fcJson,
+                    RawResponse = fcJson,
                     InputTokens = userInput.Length / 4,
                     OutputTokens = fcJson.Length / 4
                 });
@@ -74,6 +75,7 @@ public class SimulatedModelProvider : IModelProvider
             Id = Guid.NewGuid().ToString(),
             Model = "simulated",
             Content = textResponse,
+            RawResponse = textResponse,
             InputTokens = userInput.Length / 4,
             OutputTokens = textResponse.Length / 4
         });

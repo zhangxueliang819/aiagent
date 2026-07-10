@@ -207,26 +207,58 @@ public class AgentChatController : ControllerBase
                 simulated.RegisterFunctions(CollectFunctionDefinitions(skills, mcpEndpoints));
             }
 
-            // 流式执行 Agent Runtime（累积 chunk 用于后续保存）
-            var responseChunks = new List<string>();
-            await foreach (var chunk in _runtime.RunStreamAsync(
-                agent, llm, history, request.Message, skills, mcpEndpoints, ct))
+            // 执行 Agent Runtime（获取完整响应，含思考过程和工具调用信息）
+            var agentResponse = await _runtime.RunAsync(
+                agent, llm, history, request.Message, skills, mcpEndpoints, ct);
+
+            // 发送推理/思考过程（如有）
+            if (!string.IsNullOrEmpty(agentResponse.Thinking))
             {
-                responseChunks.Add(chunk);
-                await WriteSseAsync(new { type = "token", content = chunk }, ct);
+                await WriteSseAsync(new { type = "thinking", content = agentResponse.Thinking }, ct);
             }
 
-            var fullResponse = string.Concat(responseChunks);
+            // 发送工具调用事件
+            foreach (var tc in agentResponse.ToolCalls)
+            {
+                await WriteSseAsync(new
+                {
+                    type = "tool_call",
+                    name = tc.Name,
+                    arguments = tc.Arguments,
+                    result = tc.Result
+                }, ct);
+            }
+
+            // 流式输出最终内容
+            var fullResponse = agentResponse.Content;
+            foreach (var ch in fullResponse)
+            {
+                await WriteSseAsync(new { type = "token", content = ch.ToString() }, ct);
+                await Task.Delay(15, ct); // 模拟打字效果
+            }
 
             // 保存助手回复
             await _memoryStore.AddMessageAsync(session.Id, "assistant", fullResponse, ct);
 
-            // 发送完成事件
+            var memoryTokens = await _memoryStore.GetTokenCountAsync(session.Id, ct);
+
+            // 发送完成事件（含完整响应元数据）
             await WriteSseAsync(new
             {
                 type = "done",
-                toolCallCount = 0,
-                memoryTokens = await _memoryStore.GetTokenCountAsync(session.Id, ct)
+                toolCallCount = agentResponse.ToolCallCount,
+                memoryTokens,
+                thinking = agentResponse.Thinking,
+                modelName = agentResponse.ModelName,
+                inputTokens = agentResponse.InputTokens,
+                outputTokens = agentResponse.OutputTokens,
+                rawResponse = agentResponse.RawResponse,
+                toolCalls = agentResponse.ToolCalls.Select(tc => new
+                {
+                    name = tc.Name,
+                    arguments = tc.Arguments,
+                    result = tc.Result
+                }).ToList()
             }, ct);
         }
         catch (Exception ex)

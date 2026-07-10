@@ -78,11 +78,14 @@ function onNavigate() {
 }
 
 .sidebar-logo {
-  padding: 18px 16px;
+  padding: 0 16px;
+  height: var(--layout-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--sidebar-logo-color);
   font-size: 18px;
   font-weight: 700;
-  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   transition: all 0.25s ease, color var(--transition-normal);
@@ -91,7 +94,7 @@ function onNavigate() {
 }
 
 .sidebar-logo.collapsed {
-  padding: 18px 0;
+  padding: 0;
   font-size: 22px;
 }
 

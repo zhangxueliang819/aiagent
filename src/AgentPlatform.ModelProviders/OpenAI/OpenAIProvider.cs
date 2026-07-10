@@ -168,6 +168,13 @@ public class OpenAIProvider : IModelProvider
         var message = firstChoice.GetProperty("message");
         var content = message.GetProperty("content").GetString() ?? "";
 
+        // 解析推理/思考内容（DeepSeek-R1 等模型支持）
+        string? thinking = null;
+        if (message.TryGetProperty("reasoning_content", out var reasoningProp))
+        {
+            thinking = reasoningProp.GetString();
+        }
+
         int inputTokens = 0, outputTokens = 0;
         if (root.TryGetProperty("usage", out var usage))
         {
@@ -182,6 +189,8 @@ public class OpenAIProvider : IModelProvider
             Id = id,
             Model = model,
             Content = content,
+            Thinking = thinking,
+            RawResponse = json,
             InputTokens = inputTokens,
             OutputTokens = outputTokens
         };
@@ -202,9 +211,10 @@ public class OpenAIProvider : IModelProvider
 
     /// <summary>
     /// 从 SSE data 行提取 delta.content（流式响应的文本增量）
-    /// 返回 null 表示跳过该帧（非 content 帧或解析失败）
+    /// 同时尝试提取 reasoning_content（推理过程）
+    /// 返回 (content, reasoningContent) 元组
     /// </summary>
-    private static string? TryExtractDeltaContent(string data)
+    private static (string? Content, string? ReasoningContent) TryExtractDelta(string data)
     {
         try
         {
@@ -212,21 +222,37 @@ public class OpenAIProvider : IModelProvider
             var root = doc.RootElement;
 
             // usage chunk (final) — 跳过
-            if (root.TryGetProperty("usage", out _)) return null;
+            if (root.TryGetProperty("usage", out _)) return (null, null);
 
-            if (!root.TryGetProperty("choices", out var choices)) return null;
-            if (choices.GetArrayLength() == 0) return null;
+            if (!root.TryGetProperty("choices", out var choices)) return (null, null);
+            if (choices.GetArrayLength() == 0) return (null, null);
 
             var first = choices[0];
-            if (!first.TryGetProperty("delta", out var delta)) return null;
-            if (!delta.TryGetProperty("content", out var content)) return null;
+            if (!first.TryGetProperty("delta", out var delta)) return (null, null);
 
-            var text = content.GetString();
-            return string.IsNullOrEmpty(text) ? null : text;
+            string? content = null;
+            if (delta.TryGetProperty("content", out var contentProp))
+                content = contentProp.GetString();
+
+            string? reasoning = null;
+            if (delta.TryGetProperty("reasoning_content", out var reasoningProp))
+                reasoning = reasoningProp.GetString();
+
+            return (content, reasoning);
         }
         catch (JsonException)
         {
-            return null;
+            return (null, null);
         }
+    }
+
+    /// <summary>
+    /// 从 SSE data 行提取 delta.content（流式响应的文本增量）
+    /// 返回 null 表示跳过该帧（非 content 帧或解析失败）
+    /// </summary>
+    private static string? TryExtractDeltaContent(string data)
+    {
+        var (content, _) = TryExtractDelta(data);
+        return string.IsNullOrEmpty(content) ? null : content;
     }
 }
