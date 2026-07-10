@@ -391,16 +391,18 @@ async function sendMessage() {
 
             case 'token':
               fullContent += data.content
-              assistantMsg.content = fullContent
+              messages.value[assistantIdx].content = fullContent
               break
 
             case 'thinking':
-              assistantMsg.thinking = (assistantMsg.thinking || '') + data.content
+              const prevThinking = messages.value[assistantIdx].thinking || ''
+              messages.value[assistantIdx].thinking = prevThinking + data.content
               break
 
             case 'tool_call':
-              assistantMsg.toolCalls = assistantMsg.toolCalls || []
-              assistantMsg.toolCalls.push({
+              const tcMsg = messages.value[assistantIdx]
+              if (!tcMsg.toolCalls) tcMsg.toolCalls = []
+              tcMsg.toolCalls.push({
                 name: data.name,
                 arguments: data.arguments || {},
                 result: data.result || ''
@@ -411,20 +413,21 @@ async function sendMessage() {
               finalToolCount = data.toolCallCount
               finalMemTokens = data.memoryTokens
               memoryTokens.value = finalMemTokens
-              assistantMsg.modelName = data.modelName
-              assistantMsg.inputTokens = data.inputTokens
-              assistantMsg.outputTokens = data.outputTokens
-              assistantMsg.rawResponse = data.rawResponse
-              if (data.thinking) assistantMsg.thinking = data.thinking
-              if (data.content && !assistantMsg.content) assistantMsg.content = data.content
-              if (!assistantMsg.content && assistantMsg.toolCalls?.length) {
-                assistantMsg.content = `完成 ${assistantMsg.toolCalls.length} 次工具调用`
+              const doneMsg = messages.value[assistantIdx]
+              doneMsg.modelName = data.modelName
+              doneMsg.inputTokens = data.inputTokens
+              doneMsg.outputTokens = data.outputTokens
+              doneMsg.rawResponse = data.rawResponse
+              if (data.thinking) doneMsg.thinking = data.thinking
+              if (data.content && !doneMsg.content) doneMsg.content = data.content
+              if (!doneMsg.content && doneMsg.toolCalls?.length) {
+                doneMsg.content = `完成 ${doneMsg.toolCalls.length} 次工具调用`
               }
               break
 
             case 'error':
-              assistantMsg.content = `发生错误: ${data.message}`
-              assistantMsg.isStreaming = false
+              messages.value[assistantIdx].content = `发生错误: ${data.message}`
+              messages.value[assistantIdx].isStreaming = false
               break
           }
         } catch {
@@ -433,13 +436,13 @@ async function sendMessage() {
       }
     }
 
-    assistantMsg.isStreaming = false
-    if (!assistantMsg.content) {
-      assistantMsg.content = '（无回复）'
+    messages.value[assistantIdx].isStreaming = false
+    if (!messages.value[assistantIdx].content) {
+      messages.value[assistantIdx].content = '（无回复）'
     }
   } catch (e: any) {
-    assistantMsg.content = `请求失败: ${e.message}`
-    assistantMsg.isStreaming = false
+    messages.value[assistantIdx].content = `请求失败: ${e.message}`
+    messages.value[assistantIdx].isStreaming = false
   } finally {
     isStreaming.value = false
   }

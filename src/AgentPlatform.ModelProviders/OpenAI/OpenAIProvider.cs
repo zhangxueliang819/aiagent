@@ -103,11 +103,35 @@ public class OpenAIProvider : IChatClient
             var data = line["data: ".Length..];
             if (data == "[DONE]") break;
 
-            var (content, reasoning) = TryExtractDelta(data);
+            using var chunkDoc = JsonDocument.Parse(data);
+            var chunkRoot = chunkDoc.RootElement;
+
+            // 提取 model ID（每个 chunk 都可能携带）
+            string? chunkModelId = null;
+            if (chunkRoot.TryGetProperty("model", out var modelProp) && modelProp.ValueKind == JsonValueKind.String)
+                chunkModelId = modelProp.GetString();
+
+            // usage 汇总 chunk（OpenAI 最后一块，含 token 统计）
+            // DeepSeek 等模型每块带 usage:null 已由 ValueKind 过滤
+            if (chunkRoot.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null)
+            {
+                yield return new ChatResponseUpdate(ChatRole.Assistant, (string?)null)
+                {
+                    ModelId = chunkModelId,
+                    AdditionalProperties = new AdditionalPropertiesDictionary
+                    {
+                        ["usage"] = usage.Clone()
+                    }
+                };
+                continue;
+            }
+
+            var (content, reasoning) = TryExtractDelta(chunkRoot);
             if (content is not null || reasoning is not null)
             {
                 yield return new ChatResponseUpdate(ChatRole.Assistant, content)
                 {
+                    ModelId = chunkModelId,
                     AdditionalProperties = reasoning is not null
                         ? new AdditionalPropertiesDictionary { ["reasoning_content"] = reasoning }
                         : null
@@ -290,15 +314,10 @@ public class OpenAIProvider : IChatClient
         _ => "user"
     };
 
-    private static (string? Content, string? ReasoningContent) TryExtractDelta(string data)
+    private static (string? Content, string? ReasoningContent) TryExtractDelta(JsonElement root)
     {
         try
         {
-            using var doc = JsonDocument.Parse(data);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("usage", out _)) return (null, null);
-
             if (!root.TryGetProperty("choices", out var choices)) return (null, null);
             if (choices.GetArrayLength() == 0) return (null, null);
 
