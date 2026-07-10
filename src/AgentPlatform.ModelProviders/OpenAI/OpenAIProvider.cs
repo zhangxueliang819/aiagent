@@ -1,21 +1,16 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using AgentPlatform.Core.Interfaces;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace AgentPlatform.ModelProviders.OpenAI;
 
 /// <summary>
-/// OpenAI 兼容 API 的 LLM Provider 实现。
+/// OpenAI 兼容 API 的 IChatClient 实现（V2.0 MEAI 标准接口）。
 /// 支持 OpenAI、Azure OpenAI 以及任何兼容 /v1/chat/completions 的 API。
-/// 
-/// 功能：
-/// - 非流式对话 (CompleteAsync)
-/// - SSE 流式对话 (CompleteStreamAsync)
-/// - 自动解析 usage tokens
 /// </summary>
-public class OpenAIProvider : IModelProvider
+public class OpenAIProvider : IChatClient
 {
     private readonly string _apiBaseUrl;
     private readonly string _apiKey;
@@ -45,34 +40,38 @@ public class OpenAIProvider : IModelProvider
     }
 
     /// <inheritdoc />
-    public async Task<ChatCompletionResponse> CompleteAsync(ChatCompletionRequest request, CancellationToken ct)
+    public async Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
         var body = new
         {
-            model = _modelId,
-            messages = BuildMessageObjects(request.Messages),
-            max_tokens = request.MaxTokens,
-            temperature = request.Temperature,
-            top_p = request.TopP ?? 1,
+            model = options?.ModelId ?? _modelId,
+            messages = BuildMessageObjects(messages),
+            max_tokens = options?.MaxOutputTokens ?? 4096,
+            temperature = options?.Temperature ?? 0.7f,
+            top_p = options?.TopP ?? 1,
             stream = false
         };
 
-        var json = await SendRequestAsync(body, ct);
-        return ParseCompletionResponse(json);
+        var json = await SendRequestAsync(body, cancellationToken);
+        return ParseChatResponse(json, options?.ModelId ?? _modelId);
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<string> CompleteStreamAsync(
-        ChatCompletionRequest request,
-        [EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var body = new
         {
-            model = _modelId,
-            messages = BuildMessageObjects(request.Messages),
-            max_tokens = request.MaxTokens,
-            temperature = request.Temperature,
-            top_p = request.TopP ?? 1,
+            model = options?.ModelId ?? _modelId,
+            messages = BuildMessageObjects(messages),
+            max_tokens = options?.MaxOutputTokens ?? 4096,
+            temperature = options?.Temperature ?? 0.7f,
+            top_p = options?.TopP ?? 1,
             stream = true,
             stream_options = new { include_usage = true }
         };
@@ -83,20 +82,20 @@ public class OpenAIProvider : IModelProvider
         };
         httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
 
-        var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+        var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
-            var errBody = await response.Content.ReadAsStringAsync(ct);
+            var errBody = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogError("OpenAI API error ({Status}): {Body}", (int)response.StatusCode, errBody);
             throw new HttpRequestException($"OpenAI API error ({response.StatusCode}): {errBody}");
         }
 
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
         string? line;
-        while ((line = await reader.ReadLineAsync(ct)) is not null && !ct.IsCancellationRequested)
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null && !cancellationToken.IsCancellationRequested)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             if (!line.StartsWith("data: ")) continue;
@@ -104,26 +103,29 @@ public class OpenAIProvider : IModelProvider
             var data = line["data: ".Length..];
             if (data == "[DONE]") break;
 
-            // Parse SSE data frame — skip malformed frames without throwing
-            var text = TryExtractDeltaContent(data);
-            if (text is not null)
-                yield return text;
+            var (content, reasoning) = TryExtractDelta(data);
+            if (content is not null || reasoning is not null)
+            {
+                yield return new ChatResponseUpdate(ChatRole.Assistant, content)
+                {
+                    AdditionalProperties = reasoning is not null
+                        ? new AdditionalPropertiesDictionary { ["reasoning_content"] = reasoning }
+                        : null
+                };
+            }
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// 健康检查
+    /// </summary>
     public async Task<bool> HealthCheckAsync()
     {
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var request = new ChatCompletionRequest
-            {
-                Messages = new List<ChatMessage> { new() { Role = "user", Content = "ping" } },
-                MaxTokens = 5,
-                Temperature = 0f
-            };
-            await CompleteAsync(request, cts.Token);
+            var msg = new ChatMessage(ChatRole.User, "ping");
+            await GetResponseAsync([msg], cancellationToken: cts.Token);
             return true;
         }
         catch (Exception ex)
@@ -132,6 +134,11 @@ public class OpenAIProvider : IModelProvider
             return false;
         }
     }
+
+    /// <inheritdoc />
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    void IDisposable.Dispose() { }
 
     // ─── Private Helpers ────────────────────────────────────────────
 
@@ -155,25 +162,23 @@ public class OpenAIProvider : IModelProvider
         return responseBody;
     }
 
-    private ChatCompletionResponse ParseCompletionResponse(string json)
+    private ChatResponse ParseChatResponse(string json, string modelId)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         var id = root.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
-        var model = root.TryGetProperty("model", out var modelProp) ? modelProp.GetString() ?? _modelId : _modelId;
+        var model = root.TryGetProperty("model", out var modelProp) ? modelProp.GetString() ?? modelId : modelId;
 
         var choices = root.GetProperty("choices");
         var firstChoice = choices[0];
         var message = firstChoice.GetProperty("message");
-        var content = message.GetProperty("content").GetString() ?? "";
+        var content = message.TryGetProperty("content", out var contentProp) ? contentProp.GetString() ?? "" : "";
 
         // 解析推理/思考内容（DeepSeek-R1 等模型支持）
         string? thinking = null;
         if (message.TryGetProperty("reasoning_content", out var reasoningProp))
-        {
             thinking = reasoningProp.GetString();
-        }
 
         int inputTokens = 0, outputTokens = 0;
         if (root.TryGetProperty("usage", out var usage))
@@ -184,75 +189,104 @@ public class OpenAIProvider : IModelProvider
                 outputTokens = c.GetInt32();
         }
 
-        return new ChatCompletionResponse
+        var responseMsg = new ChatMessage(ChatRole.Assistant, content);
+        var additionalProps = new AdditionalPropertiesDictionary();
+        if (thinking is not null)
+            additionalProps["thinking"] = thinking;
+        if (!string.IsNullOrEmpty(id))
+            additionalProps["response_id"] = id;
+
+        return new ChatResponse(responseMsg)
         {
-            Id = id,
-            Model = model,
-            Content = content,
-            Thinking = thinking,
-            RawResponse = json,
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens
+            ResponseId = id,
+            ModelId = model,
+            AdditionalProperties = additionalProps.Count > 0 ? additionalProps : null,
+            Usage = inputTokens > 0 || outputTokens > 0
+                ? new UsageDetails
+                {
+                    InputTokenCount = inputTokens,
+                    OutputTokenCount = outputTokens
+                }
+                : null
         };
     }
 
     /// <summary>
-    /// 映射角色名到 OpenAI 期望格式（system / user / assistant / function / tool）
+    /// 将 MEAI ChatMessage 序列化为 OpenAI API 兼容的消息对象。
+    /// 处理 Contents 中的 FunctionCallContent / FunctionResultContent。
     /// </summary>
-    private static string MapRole(string role) => role.ToLower() switch
+    private static IEnumerable<object> BuildMessageObjects(IEnumerable<ChatMessage> messages)
+    {
+        foreach (var m in messages)
+        {
+            var role = MapRole(m.Role);
+
+            // 检查 Contents 中是否有 FunctionCallContent (assistant tool_calls)
+            var functionCalls = m.Contents.OfType<FunctionCallContent>().ToList();
+            if (functionCalls.Count > 0)
+            {
+                var msg = new Dictionary<string, object?>
+                {
+                    ["role"] = role,
+                    ["content"] = null,
+                    ["tool_calls"] = functionCalls.Select(fc => new Dictionary<string, object?>
+                    {
+                        ["id"] = fc.CallId,
+                        ["type"] = "function",
+                        ["function"] = new Dictionary<string, object?>
+                        {
+                            ["name"] = fc.Name,
+                            ["arguments"] = fc.Arguments is IDictionary<string, object?> dict
+                                ? JsonSerializer.Serialize(dict)
+                                : JsonSerializer.Serialize(fc.Arguments)
+                        }
+                    }).ToList()
+                };
+                if (!string.IsNullOrWhiteSpace(m.Text))
+                    msg["content"] = m.Text;
+                yield return msg;
+                continue;
+            }
+
+            // 检查 Contents 中是否有 FunctionResultContent (tool result)
+            var functionResults = m.Contents.OfType<FunctionResultContent>().ToList();
+            if (functionResults.Count > 0)
+            {
+                foreach (var fr in functionResults)
+                {
+                    var toolMsg = new Dictionary<string, object?>
+                    {
+                        ["role"] = "tool",
+                        ["tool_call_id"] = fr.CallId,
+                        ["content"] = fr.Result?.ToString() ?? ""
+                    };
+                    yield return toolMsg;
+                }
+                // Also yield the original text if there's additional content
+                if (!string.IsNullOrWhiteSpace(m.Text) && functionResults.Count > 0)
+                    continue; // tool messages replace the parent message
+                continue;
+            }
+
+            // 普通文本消息
+            yield return new Dictionary<string, object?>
+            {
+                ["role"] = role,
+                ["content"] = m.Text ?? string.Empty
+            };
+        }
+    }
+
+    private static string MapRole(ChatRole role) => role.Value?.ToLower() switch
     {
         "system" => "system",
         "user" => "user",
         "assistant" => "assistant",
-        "function" => "tool",   // OpenAI 现在用 tool 角色
         "tool" => "tool",
+        "function" => "tool",
         _ => "user"
     };
 
-    /// <summary>
-    /// 构建符合 OpenAI API 规范的消息对象列表（支持 tool_calls 和 tool_call_id）
-    /// </summary>
-    private static IEnumerable<object> BuildMessageObjects(List<ChatMessage> messages)
-    {
-        foreach (var m in messages)
-        {
-            var msg = new Dictionary<string, object?> { ["role"] = MapRole(m.Role) };
-
-            if (m.ToolCalls is { Count: > 0 })
-            {
-                // Assistant 发起 function call——使用 tool_calls 数组，content 设为 null
-                msg["content"] = null;
-                msg["tool_calls"] = m.ToolCalls.Select(tc => new Dictionary<string, object?>
-                {
-                    ["id"] = tc.Id,
-                    ["type"] = "function",
-                    ["function"] = new Dictionary<string, object?>
-                    {
-                        ["name"] = tc.FunctionName,
-                        ["arguments"] = tc.Arguments
-                    }
-                }).ToList();
-            }
-            else
-            {
-                msg["content"] = m.Content;
-            }
-
-            // Tool/function 响应消息需要 tool_call_id
-            if (!string.IsNullOrEmpty(m.ToolCallId))
-            {
-                msg["tool_call_id"] = m.ToolCallId;
-            }
-
-            yield return msg;
-        }
-    }
-
-    /// <summary>
-    /// 从 SSE data 行提取 delta.content（流式响应的文本增量）
-    /// 同时尝试提取 reasoning_content（推理过程）
-    /// 返回 (content, reasoningContent) 元组
-    /// </summary>
     private static (string? Content, string? ReasoningContent) TryExtractDelta(string data)
     {
         try
@@ -260,7 +294,6 @@ public class OpenAIProvider : IModelProvider
             using var doc = JsonDocument.Parse(data);
             var root = doc.RootElement;
 
-            // usage chunk (final) — 跳过
             if (root.TryGetProperty("usage", out _)) return (null, null);
 
             if (!root.TryGetProperty("choices", out var choices)) return (null, null);
@@ -283,15 +316,5 @@ public class OpenAIProvider : IModelProvider
         {
             return (null, null);
         }
-    }
-
-    /// <summary>
-    /// 从 SSE data 行提取 delta.content（流式响应的文本增量）
-    /// 返回 null 表示跳过该帧（非 content 帧或解析失败）
-    /// </summary>
-    private static string? TryExtractDeltaContent(string data)
-    {
-        var (content, _) = TryExtractDelta(data);
-        return string.IsNullOrEmpty(content) ? null : content;
     }
 }

@@ -2,13 +2,13 @@ using System.Collections.Concurrent;
 using AgentPlatform.Core.Entities;
 using AgentPlatform.Core.Interfaces;
 using AgentPlatform.ModelProviders.OpenAI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace AgentPlatform.Application.Services;
 
 /// <summary>
-/// 模型路由器：支持负载均衡策略（RoundRobin / Weighted / LeastConnections）
-/// 集成速率限制和性能指标收集
+/// 模型路由器（V2.0）：返回 MEAI IChatClient，支持负载均衡策略。
 /// </summary>
 public class ModelRouter
 {
@@ -36,9 +36,9 @@ public class ModelRouter
     }
 
     /// <summary>
-    /// 根据 Agent 解析 IModelProvider（直接使用 Agent 配置的 ModelEndpointId）
+    /// 根据 Agent 解析 IChatClient（直接使用 Agent 配置的 ModelEndpointId）
     /// </summary>
-    public async Task<IModelProvider?> ResolveAsync(Agent agent, CancellationToken ct = default)
+    public async Task<IChatClient?> ResolveAsync(Agent agent, CancellationToken ct = default)
     {
         if (agent.ModelEndpointId is null)
             return null;
@@ -48,20 +48,19 @@ public class ModelRouter
         if (endpoint is null)
             return null;
 
-        return await CreateProviderAsync(endpoint, ct);
+        return CreateProvider(endpoint);
     }
 
     /// <summary>
     /// 根据负载均衡策略从 Provider 中选取最优端点
     /// </summary>
-    public async Task<(IModelProvider Provider, ModelEndpoint Endpoint)?> ResolveWithLoadBalancingAsync(
+    public async Task<(IChatClient Provider, ModelEndpoint Endpoint)?> ResolveWithLoadBalancingAsync(
         ModelProvider provider, int estimatedTokens = 0, CancellationToken ct = default)
     {
         var endpoints = await _repo.GetEnabledEndpointsByProviderAsync(provider.Id, ct);
         if (endpoints.Count == 0)
             return null;
 
-        // 过滤被限流的端点
         var available = endpoints.Where(e =>
         {
             if (e.RpmLimit > 0 && _rateLimiter.IsRateLimited(e.Id, e.RpmLimit, e.TpmLimit))
@@ -70,7 +69,7 @@ public class ModelRouter
         }).ToList();
 
         if (available.Count == 0)
-            available = endpoints; // 全被限流时降级为任选
+            available = endpoints;
 
         var selected = provider.RoutingStrategy switch
         {
@@ -79,20 +78,17 @@ public class ModelRouter
             _ => SelectRoundRobin(available)
         };
 
-        // 速率限制检查
         var (allowed, _) = _rateLimiter.CheckAndRecord(selected.Id, estimatedTokens, selected.RpmLimit, selected.TpmLimit);
         if (!allowed)
         {
-            // 如果被限流，尝试 RoundRobin 回退
             selected = SelectRoundRobin(available);
             _rateLimiter.CheckAndRecord(selected.Id, estimatedTokens, selected.RpmLimit, selected.TpmLimit);
         }
 
-        var llmProvider = await CreateProviderAsync(selected, ct);
+        var llmProvider = CreateProvider(selected);
         return llmProvider is null ? null : (llmProvider, selected);
     }
 
-    /// <summary>轮询策略</summary>
     private ModelEndpoint SelectRoundRobin(List<ModelEndpoint> endpoints)
     {
         var providerId = endpoints[0].ModelProviderId;
@@ -100,7 +96,6 @@ public class ModelRouter
         return endpoints[counter % endpoints.Count];
     }
 
-    /// <summary>权重策略</summary>
     private static ModelEndpoint SelectWeighted(List<ModelEndpoint> endpoints)
     {
         var totalWeight = endpoints.Sum(e => e.Weight);
@@ -117,7 +112,6 @@ public class ModelRouter
         return endpoints[^1];
     }
 
-    /// <summary>最少连接策略</summary>
     private ModelEndpoint SelectLeastConnections(List<ModelEndpoint> endpoints)
     {
         ModelEndpoint? best = null;
@@ -144,8 +138,6 @@ public class ModelRouter
         _metricsCollector.Reset(endpointId);
     }
 
-    // ─── Private Helpers ────────────────────────────────────────────
-
     private async Task<ModelEndpoint?> GetEndpointAsync(Guid endpointId, CancellationToken ct)
     {
         if (_providers.TryGetValue(endpointId, out var cached) && !cached.IsExpired)
@@ -158,29 +150,25 @@ public class ModelRouter
         return endpoint;
     }
 
-    private Task<IModelProvider?> CreateProviderAsync(ModelEndpoint endpoint, CancellationToken ct)
+    private IChatClient? CreateProvider(ModelEndpoint endpoint)
     {
         if (!endpoint.IsEnabled)
-        {
             throw new InvalidOperationException($"Model endpoint '{endpoint.ModelName}' is disabled.");
-        }
 
         if (endpoint.ModelProvider is null)
-            return Task.FromResult<IModelProvider?>(null);
+            return null;
 
         var httpClient = _httpClientFactory.CreateClient($"llm-{endpoint.Id}");
 
-        var provider = new OpenAIProvider(
+        return new OpenAIProvider(
             endpoint.ModelProvider.ApiBaseUrl,
             endpoint.ModelProvider.EncryptedApiKey,
             endpoint.ModelId,
             httpClient,
             _loggerFactory.CreateLogger<OpenAIProvider>());
-
-        return Task.FromResult<IModelProvider?>(provider);
     }
 
-    private record CachedProvider(ModelEndpoint Endpoint, IModelProvider Provider, DateTime ExpiresAt)
+    private record CachedProvider(ModelEndpoint Endpoint, IChatClient Provider, DateTime ExpiresAt)
     {
         public bool IsExpired => DateTime.UtcNow > ExpiresAt;
     }

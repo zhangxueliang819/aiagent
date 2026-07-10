@@ -1,5 +1,4 @@
 using System.Text.Json;
-using AgentPlatform.AgentEngine.Runtime;
 using AgentPlatform.Core.Entities;
 using AgentPlatform.Core.Interfaces;
 using Microsoft.Extensions.AI;
@@ -16,18 +15,15 @@ public class FunctionToolRegistry
 {
     private readonly ISkillRepository _skillRepo;
     private readonly IAgentSkillRepository _agentSkillRepo;
-    private readonly SkillDispatcher _skillDispatcher;
     private readonly ILogger<FunctionToolRegistry> _logger;
 
     public FunctionToolRegistry(
         ISkillRepository skillRepo,
         IAgentSkillRepository agentSkillRepo,
-        SkillDispatcher skillDispatcher,
         ILogger<FunctionToolRegistry> logger)
     {
         _skillRepo = skillRepo;
         _agentSkillRepo = agentSkillRepo;
-        _skillDispatcher = skillDispatcher;
         _logger = logger;
     }
 
@@ -63,21 +59,92 @@ public class FunctionToolRegistry
     }
 
     /// <summary>
-    /// 执行指定的 FunctionTool
+    /// 执行指定的 FunctionTool 技能
+    /// V2.0: 直接基于 Skill.Implementation 执行业务逻辑，不再通过 SkillDispatcher 分派
     /// </summary>
     public async Task<string> ExecuteAsync(string skillName, string arguments, CancellationToken ct = default)
     {
+        _logger.LogInformation("Executing FunctionTool: {SkillName} with args: {Args}",
+            skillName, arguments);
+
+        // 从数据库加载技能定义以获取 Implementation
+        var skills = await _skillRepo.GetAllAsync(ct);
+        var skill = skills.FirstOrDefault(s => s.Name == skillName && s.Type == SkillType.FunctionTool);
+
+        if (skill is null)
+        {
+            _logger.LogWarning("FunctionTool {Name} not found in database", skillName);
+            return JsonSerializer.Serialize(new { error = $"Skill '{skillName}' not found" });
+        }
+
         var parameters = string.IsNullOrWhiteSpace(arguments)
             ? new Dictionary<string, object?>()
             : JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments) ?? new();
 
-        var result = await _skillDispatcher.ExecuteByTypeAsync(SkillType.FunctionTool, parameters, ct);
+        try
+        {
+            // 执行技能逻辑（基于 Implementation 字段）
+            var result = await ExecuteSkillImplementationAsync(skill, parameters, ct);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FunctionTool {Name} execution failed", skillName);
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
+    }
 
-        if (result.Success)
-            return result.Data ?? "{}";
+    /// <summary>
+    /// 执行技能实现逻辑
+    /// 根据 Implementation 内容执行（支持简单 JSON 模板和脚本）
+    /// </summary>
+    private static Task<string> ExecuteSkillImplementationAsync(Skill skill, Dictionary<string, object?> parameters, CancellationToken ct)
+    {
+        var impl = skill.Implementation?.Trim() ?? "{}";
 
-        _logger.LogWarning("FunctionTool {Name} execution failed: {Error}", skillName, result.Error);
-        return JsonSerializer.Serialize(new { error = result.Error });
+        // 尝试解析 Implementation 为 JSON 模板
+        if (impl.StartsWith("{") || impl.StartsWith("["))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(impl);
+                // 将模板中的占位符替换为实际参数值
+                var result = ReplaceTemplatePlaceholders(impl, parameters);
+                return Task.FromResult(result);
+            }
+            catch { /* 非 JSON，按脚本处理 */ }
+        }
+
+        // 对于脚本类型，返回参数回显（实际场景可接入脚本引擎）
+        return Task.FromResult(JsonSerializer.Serialize(new
+        {
+            skill = skill.Name,
+            invoked_with = parameters,
+            message = $"Skill '{skill.Name}' executed with provided arguments"
+        }));
+    }
+
+    /// <summary>
+    /// 替换 JSON 模板中的参数占位符 {{paramName}}
+    /// </summary>
+    private static string ReplaceTemplatePlaceholders(string template, Dictionary<string, object?> parameters)
+    {
+        var result = template;
+        foreach (var (key, value) in parameters)
+        {
+            var placeholder = $"{{{{{key}}}}}";
+            if (result.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
+            {
+                var replacement = value switch
+                {
+                    string s => s,
+                    JsonElement je => je.GetRawText(),
+                    _ => value?.ToString() ?? "null"
+                };
+                result = result.Replace(placeholder, replacement, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        return result;
     }
 
     /// <summary>

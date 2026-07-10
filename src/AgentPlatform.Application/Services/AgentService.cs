@@ -68,10 +68,13 @@ public class AgentService
         if (request.ModelEndpointId.HasValue) { agent.ModelEndpointId = request.ModelEndpointId; changes.Add("模型端点"); }
         if (request.Status is not null && Enum.TryParse<AgentStatus>(request.Status, out var s))
         {
-            if (!IsValidTransition(agent.Status, s))
-                throw new InvalidOperationException($"不允许从 {agent.Status} 切换到 {s}");
-            agent.Status = s;
-            changes.Add($"状态({s})");
+            if (agent.Status != s)
+            {
+                if (!IsValidTransition(agent.Status, s))
+                    throw new InvalidOperationException($"不允许从 {agent.Status} 切换到 {s}");
+                agent.Status = s;
+                changes.Add($"状态({s})");
+            }
         }
         if (request.Temperature.HasValue) { agent.Temperature = request.Temperature; changes.Add("Temperature"); }
         if (request.MaxTokens.HasValue) { agent.MaxTokens = request.MaxTokens; changes.Add("MaxTokens"); }

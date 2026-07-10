@@ -67,19 +67,10 @@ try
     builder.Services.AddSingleton<RateLimiter>();
     builder.Services.AddSingleton<ModelMetricsCollector>();
 
-    // Agent Engine - Skill Executors
-    builder.Services.AddSingleton<ISkillExecutor, ToolSkillExecutor>();
-    builder.Services.AddSingleton<ISkillExecutor, ApiSkillExecutor>();
-    builder.Services.AddSingleton<ISkillExecutor, ScriptSkillExecutor>();
-    builder.Services.AddSingleton<ISkillExecutor, CompositeSkillExecutor>();
-
     // Agent Engine - Short-Term Memory
     builder.Services.AddScoped<IShortTermMemoryStore, ShortTermMemoryStore>();
 
-    // Agent Engine - Runtime
-    builder.Services.AddSingleton<SkillDispatcher>();
-    builder.Services.AddSingleton<FunctionCallHandler>();
-    builder.Services.AddSingleton<AgentRuntime>();
+    // Agent Engine - Runtime (V2.0: removed SkillDispatcher, FunctionCallHandler, AgentRuntime)
 
     // Agent Engine - Skills (MAF Phase 0) — Scoped：依赖 ISkillRepository 等 EF Core 仓库
     builder.Services.AddScoped<DatabaseSkillSource>();
@@ -120,7 +111,7 @@ try
 
     // Simulated LLM (dev fallback when Agent has no ModelEndpoint configured)
     builder.Services.AddSingleton<SimulatedModelProvider>();
-    builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<SimulatedModelProvider>());
+    builder.Services.AddSingleton<Microsoft.Extensions.AI.IChatClient>(sp => sp.GetRequiredService<SimulatedModelProvider>());
 
     // Controllers
     builder.Services.AddControllers();

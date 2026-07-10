@@ -1,55 +1,38 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using AgentPlatform.Application.DTOs;
-using AgentPlatform.Application.Services;
 using AgentPlatform.Core.Entities;
 using AgentPlatform.Core.Interfaces;
 using AgentPlatform.AgentEngine.Runtime;
-using AgentPlatform.ModelProviders.Simulated;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AgentPlatform.Web.Controllers;
 
 /// <summary>
-/// Agent 对话 API：完整的 Agent → LLM → FunctionCall → Skill/MCP 链路
-/// 支持非流式 (send) 和流式 SSE (stream) 两种模式
+/// Agent 对话 API（V2.0）：使用 MAF ChatClientAgent + AgentRuntimeFactory。
+/// 支持非流式 (send) 和流式 SSE (stream) 两种模式。
 /// </summary>
 [ApiController]
 [Route("api/v1/agents/{agentId:guid}/chat")]
 public class AgentChatController : ControllerBase
 {
     private readonly IAgentRepository _agentRepo;
-    private readonly IAgentSkillRepository _agentSkillRepo;
-    private readonly IAgentMcpEndpointRepository _agentMcpRepo;
     private readonly ISessionRepository _sessionRepo;
     private readonly IShortTermMemoryStore _memoryStore;
-    private readonly AgentRuntime _runtime;
-    private readonly ModelRouter _modelRouter;
-    private readonly SimulatedModelProvider _fallbackLlm;
+    private readonly AgentRuntimeFactory _runtimeFactory;
     private readonly ILogger<AgentChatController> _logger;
-
-    /// <summary>LLM 上下文窗口最大 Token 数（含 system prompt 和 function defs 的预留）</summary>
-    private const int MaxContextTokens = 4096;
 
     public AgentChatController(
         IAgentRepository agentRepo,
-        IAgentSkillRepository agentSkillRepo,
-        IAgentMcpEndpointRepository agentMcpRepo,
         ISessionRepository sessionRepo,
         IShortTermMemoryStore memoryStore,
-        AgentRuntime runtime,
-        ModelRouter modelRouter,
-        SimulatedModelProvider fallbackLlm,
+        AgentRuntimeFactory runtimeFactory,
         ILogger<AgentChatController> logger)
     {
         _agentRepo = agentRepo;
-        _agentSkillRepo = agentSkillRepo;
-        _agentMcpRepo = agentMcpRepo;
         _sessionRepo = sessionRepo;
         _memoryStore = memoryStore;
-        _runtime = runtime;
-        _modelRouter = modelRouter;
-        _fallbackLlm = fallbackLlm;
+        _runtimeFactory = runtimeFactory;
         _logger = logger;
     }
 
@@ -64,16 +47,6 @@ public class AgentChatController : ControllerBase
     {
         var agent = await _agentRepo.GetByIdAsync(agentId, ct);
         if (agent is null) return NotFound(new ApiResponse<ChatResult>(false, "Agent not found", null));
-
-        // 加载 Agent 关联的 Skill 和 MCP
-        var agentSkills = await _agentSkillRepo.GetByAgentIdAsync(agentId, ct);
-        var agentMcps = await _agentMcpRepo.GetByAgentIdAsync(agentId, ct);
-
-        var skills = agentSkills.Where(x => x.IsEnabled).Select(x => x.Skill!).Where(s => s.IsEnabled).ToList();
-        var mcpEndpoints = agentMcps.Where(x => x.IsEnabled).Select(x => x.McpEndpoint!).Where(e => e.IsEnabled).ToList();
-
-        _logger.LogInformation("Agent {AgentName}: {SkillCount} skills, {McpCount} MCP endpoints",
-            agent.Name, skills.Count, mcpEndpoints.Count);
 
         // 获取或创建 Session
         Session session;
@@ -98,37 +71,12 @@ public class AgentChatController : ControllerBase
         // 保存用户消息到短期记忆
         await _memoryStore.AddMessageAsync(session.Id, "user", request.Message, ct);
 
-        // 获取上下文窗口（Token 预算管理）
-        var contextWindow = await _memoryStore.GetContextWindowAsync(session.Id, MaxContextTokens, ct);
-        var history = contextWindow.Select(m => new Conversation
-        {
-            Role = m.Role,
-            Content = m.Content,
-            CreatedAt = m.CreatedAt
-        }).ToList();
-
-        // 解析 LLM Provider（真实 API 或回退到模拟）
-        var llm = await ResolveLlmAsync(agent, ct);
-
-        // 设置模拟 LLM 的函数列表
-        if (llm is SimulatedModelProvider simulated)
-        {
-            simulated.RegisterFunctions(CollectFunctionDefinitions(skills, mcpEndpoints));
-        }
-
-        // 执行 Agent Runtime
-        var response = await _runtime.RunAsync(
-            agent, llm,
-            history,
-            request.Message,
-            skills,
-            mcpEndpoints,
-            ct);
+        // V2.0: 使用 AgentRuntimeFactory.RunAsync（MAF ChatClientAgent）
+        var response = await _runtimeFactory.RunAsync(agent, session.Id, request.Message, ct);
 
         // 保存助手回复到短期记忆
         await _memoryStore.AddMessageAsync(session.Id, "assistant", response.Content, ct);
 
-        // 获取上下文统计
         var memoryTokens = await _memoryStore.GetTokenCountAsync(session.Id, ct);
 
         return Ok(new ApiResponse<ChatResult>(true, "OK", new ChatResult(
@@ -136,8 +84,8 @@ public class AgentChatController : ControllerBase
     }
 
     /// <summary>
-    /// SSE 流式对话端点
-    /// 响应格式：data: {"type":"token"|"tool_call"|"tool_result"|"done"|"error", ...}\n\n
+    /// SSE 流式对话端点（V2.0 真流式）
+    /// 响应格式：data: {"type":"thinking"|"token"|"tool_call"|"done"|"error", ...}\n\n
     /// </summary>
     [HttpPost("stream")]
     public async Task StreamMessage(
@@ -157,12 +105,6 @@ public class AgentChatController : ControllerBase
                 await WriteSseAsync(new { type = "error", message = "Agent not found" }, ct);
                 return;
             }
-
-            // 加载关联
-            var agentSkills = await _agentSkillRepo.GetByAgentIdAsync(agentId, ct);
-            var agentMcps = await _agentMcpRepo.GetByAgentIdAsync(agentId, ct);
-            var skills = agentSkills.Where(x => x.IsEnabled).Select(x => x.Skill!).Where(s => s.IsEnabled).ToList();
-            var mcpEndpoints = agentMcps.Where(x => x.IsEnabled).Select(x => x.McpEndpoint!).Where(e => e.IsEnabled).ToList();
 
             // 获取或创建 Session
             Session session;
@@ -184,104 +126,79 @@ public class AgentChatController : ControllerBase
                 }, ct);
             }
 
-            // 发送 session 信息
             await WriteSseAsync(new { type = "session", sessionId = session.Id.ToString() }, ct);
 
             // 保存用户消息
             await _memoryStore.AddMessageAsync(session.Id, "user", request.Message, ct);
 
-            // 获取上下文窗口
-            var contextWindow = await _memoryStore.GetContextWindowAsync(session.Id, MaxContextTokens, ct);
-            var history = contextWindow.Select(m => new Conversation
+            // V2.0 真流式：逐 token 从 LLM 获取
+            var fullContent = "";
+            var toolCalls = new List<object>();
+
+            await foreach (var delta in _runtimeFactory.RunStreamingAsync(agent, session.Id, request.Message, ct))
             {
-                Role = m.Role,
-                Content = m.Content,
-                CreatedAt = m.CreatedAt
-            }).ToList();
-
-            var llm = await ResolveLlmAsync(agent, ct);
-
-            // 注册函数
-            if (llm is SimulatedModelProvider simulated)
-            {
-                simulated.RegisterFunctions(CollectFunctionDefinitions(skills, mcpEndpoints));
-            }
-
-            // 执行 Agent Runtime（获取完整响应，含思考过程和工具调用信息）
-            var agentResponse = await _runtime.RunAsync(
-                agent, llm, history, request.Message, skills, mcpEndpoints, ct);
-
-            // 发送推理/思考过程（如有）
-            if (!string.IsNullOrEmpty(agentResponse.Thinking))
-            {
-                await WriteSseAsync(new { type = "thinking", content = agentResponse.Thinking }, ct);
-            }
-
-            // 发送工具调用事件
-            foreach (var tc in agentResponse.ToolCalls)
-            {
-                await WriteSseAsync(new
+                switch (delta.Type)
                 {
-                    type = "tool_call",
-                    name = tc.Name,
-                    arguments = tc.Arguments,
-                    result = tc.Result
-                }, ct);
+                    case AgentPlatform.AgentEngine.Runtime.StreamDeltaType.Thinking:
+                        if (!string.IsNullOrEmpty(delta.Thinking))
+                            await WriteSseAsync(new { type = "thinking", content = delta.Thinking }, ct);
+                        break;
+
+                    case AgentPlatform.AgentEngine.Runtime.StreamDeltaType.Token:
+                        if (!string.IsNullOrEmpty(delta.Content))
+                        {
+                            fullContent += delta.Content;
+                            await WriteSseAsync(new { type = "token", content = delta.Content }, ct);
+                        }
+                        break;
+
+                    case AgentPlatform.AgentEngine.Runtime.StreamDeltaType.ToolCall:
+                        toolCalls.Add(new
+                        {
+                            name = delta.ToolCallName,
+                            arguments = delta.ToolCallArgs,
+                            result = delta.ToolCallResult
+                        });
+                        await WriteSseAsync(new
+                        {
+                            type = "tool_call",
+                            name = delta.ToolCallName,
+                            arguments = delta.ToolCallArgs,
+                            result = delta.ToolCallResult
+                        }, ct);
+                        break;
+
+                    case AgentPlatform.AgentEngine.Runtime.StreamDeltaType.Done:
+                        // 保存助手回复
+                        await _memoryStore.AddMessageAsync(session.Id, "assistant", delta.Content ?? fullContent, ct);
+                        var memoryTokens = await _memoryStore.GetTokenCountAsync(session.Id, ct);
+
+                        await WriteSseAsync(new
+                        {
+                            type = "done",
+                            content = delta.Content ?? fullContent,
+                            thinking = delta.Thinking,
+                            toolCallCount = delta.ToolCallCount,
+                            memoryTokens,
+                            modelName = delta.ModelName,
+                            inputTokens = delta.InputTokens,
+                            outputTokens = delta.OutputTokens,
+                            toolCalls = delta.ToolCalls.Select(tc => new
+                            {
+                                name = tc.Name,
+                                arguments = tc.Arguments,
+                                result = tc.Result
+                            }).ToList()
+                        }, ct);
+                        break;
+                }
             }
-
-            // 流式输出最终内容
-            var fullResponse = agentResponse.Content;
-            foreach (var ch in fullResponse)
-            {
-                await WriteSseAsync(new { type = "token", content = ch.ToString() }, ct);
-                await Task.Delay(15, ct); // 模拟打字效果
-            }
-
-            // 保存助手回复
-            await _memoryStore.AddMessageAsync(session.Id, "assistant", fullResponse, ct);
-
-            var memoryTokens = await _memoryStore.GetTokenCountAsync(session.Id, ct);
-
-            // 发送完成事件（含完整响应元数据）
-            await WriteSseAsync(new
-            {
-                type = "done",
-                toolCallCount = agentResponse.ToolCallCount,
-                memoryTokens,
-                thinking = agentResponse.Thinking,
-                modelName = agentResponse.ModelName,
-                inputTokens = agentResponse.InputTokens,
-                outputTokens = agentResponse.OutputTokens,
-                rawResponse = agentResponse.RawResponse,
-                toolCalls = agentResponse.ToolCalls.Select(tc => new
-                {
-                    name = tc.Name,
-                    arguments = tc.Arguments,
-                    result = tc.Result
-                }).ToList()
-            }, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "SSE streaming error");
             await WriteSseAsync(new { type = "error", message = ex.Message }, ct);
         }
-    }
-
-    /// <summary>
-    /// 解析 Agent 对应的 LLM Provider：优先使用真实 API，未配置则回退到模拟 LLM
-    /// </summary>
-    private async Task<IModelProvider> ResolveLlmAsync(Agent agent, CancellationToken ct)
-    {
-        var realProvider = await _modelRouter.ResolveAsync(agent, ct);
-        if (realProvider is not null)
-        {
-            _logger.LogInformation("Using real LLM provider for Agent {AgentName}", agent.Name);
-            return realProvider;
-        }
-
-        _logger.LogInformation("Agent {AgentName} has no model endpoint configured, using simulated LLM", agent.Name);
-        return _fallbackLlm;
     }
 
     /// <summary>
@@ -295,30 +212,6 @@ public class AgentChatController : ControllerBase
         });
         await Response.WriteAsync($"data: {json}\n\n", ct);
         await Response.Body.FlushAsync(ct);
-    }
-
-    /// <summary>
-    /// 收集所有可用函数的定义（供 LLM function calling 使用）
-    /// </summary>
-    private static Dictionary<string, (string Description, string Schema)> CollectFunctionDefinitions(
-        List<Skill> skills, List<McpEndpoint> mcpEndpoints)
-    {
-        var defs = new Dictionary<string, (string Description, string Schema)>();
-
-        foreach (var skill in skills)
-        {
-            defs[skill.Name] = (skill.Description, skill.InputSchema);
-        }
-
-        foreach (var mcp in mcpEndpoints)
-        {
-            foreach (var tool in mcp.Tools)
-            {
-                defs[tool.ToolName] = (tool.Description, tool.InputSchema);
-            }
-        }
-
-        return defs;
     }
 }
 

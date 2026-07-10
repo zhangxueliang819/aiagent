@@ -396,7 +396,7 @@ async function sendMessage() {
               break
 
             case 'thinking':
-              assistantMsg.thinking = data.content
+              assistantMsg.thinking = (assistantMsg.thinking || '') + data.content
               break
 
             case 'tool_call':
@@ -416,6 +416,8 @@ async function sendMessage() {
               assistantMsg.inputTokens = data.inputTokens
               assistantMsg.outputTokens = data.outputTokens
               assistantMsg.rawResponse = data.rawResponse
+              if (data.thinking) assistantMsg.thinking = data.thinking
+              if (data.content && !assistantMsg.content) assistantMsg.content = data.content
               if (!assistantMsg.content && assistantMsg.toolCalls?.length) {
                 assistantMsg.content = `完成 ${assistantMsg.toolCalls.length} 次工具调用`
               }

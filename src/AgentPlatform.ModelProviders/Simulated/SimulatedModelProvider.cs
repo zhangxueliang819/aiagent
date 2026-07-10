@@ -1,16 +1,15 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
-using AgentPlatform.Core.Interfaces;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace AgentPlatform.ModelProviders.Simulated;
 
 /// <summary>
-/// 模拟 LLM 实现，用于在没有真实 LLM 的情况下测试完整的 Agent → FunctionCall → Skill/MCP 链路
-/// 
-/// 它会智能地检测用户输入中是否应该触发 function call，
-/// 如果匹配到 Skill/MCP 工具则返回 function_call JSON，否则返回模拟回复。
+/// 模拟 IChatClient 实现（V2.0 MEAI 标准接口），用于在没有真实 LLM 时测试 Agent 链路。
+/// 支持简单的 function call 模拟：检测输入中的关键词并生成 tool_calls。
 /// </summary>
-public class SimulatedModelProvider : IModelProvider
+public class SimulatedModelProvider : IChatClient
 {
     private readonly ILogger<SimulatedModelProvider> _logger;
     private readonly Dictionary<string, (string Description, string Schema)> _knownFunctions = new();
@@ -34,10 +33,14 @@ public class SimulatedModelProvider : IModelProvider
         _logger.LogInformation("Registered {Count} functions for simulated LLM", functions.Count);
     }
 
-    public Task<ChatCompletionResponse> CompleteAsync(ChatCompletionRequest request, CancellationToken ct)
+    /// <inheritdoc />
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
-        var lastMessage = request.Messages.LastOrDefault();
-        var userInput = lastMessage?.Content ?? "";
+        var lastMessage = messages.LastOrDefault();
+        var userInput = lastMessage?.Text ?? "";
 
         _logger.LogInformation("SimulatedLLM received: {Input}", userInput[..Math.Min(userInput.Length, 200)]);
 
@@ -47,22 +50,24 @@ public class SimulatedModelProvider : IModelProvider
             if (ShouldCallFunction(userInput, name))
             {
                 var args = ExtractArguments(userInput, name, def.Schema);
-                var fcJson = JsonSerializer.Serialize(new
-                {
-                    name,
-                    arguments = args
-                });
+                var argsJson = JsonSerializer.Serialize(args);
+                var callId = $"call_{Guid.NewGuid():N}";
 
-                _logger.LogInformation("SimulatedLLM → function_call: {Name}({Args})", name, JsonSerializer.Serialize(args));
+                _logger.LogInformation("SimulatedLLM → function_call: {Name}({Args})", name, argsJson);
 
-                return Task.FromResult(new ChatCompletionResponse
+                // 返回含 FunctionCallContent 的 ChatResponse
+                var fcContent = new FunctionCallContent(callId, name, new Dictionary<string, object?>(args));
+                var fcMessage = new ChatMessage(ChatRole.Assistant, [fcContent]);
+
+                return Task.FromResult(new ChatResponse(fcMessage)
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    Model = "simulated",
-                    Content = fcJson,
-                    RawResponse = fcJson,
-                    InputTokens = userInput.Length / 4,
-                    OutputTokens = fcJson.Length / 4
+                    ResponseId = Guid.NewGuid().ToString(),
+                    ModelId = "simulated",
+                    Usage = new UsageDetails
+                    {
+                        InputTokenCount = userInput.Length / 4,
+                        OutputTokenCount = argsJson.Length / 4
+                    }
                 });
             }
         }
@@ -70,34 +75,76 @@ public class SimulatedModelProvider : IModelProvider
         // 否则返回普通文本
         var textResponse = GenerateTextResponse(userInput);
 
-        return Task.FromResult(new ChatCompletionResponse
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, textResponse))
         {
-            Id = Guid.NewGuid().ToString(),
-            Model = "simulated",
-            Content = textResponse,
-            RawResponse = textResponse,
-            InputTokens = userInput.Length / 4,
-            OutputTokens = textResponse.Length / 4
+            ResponseId = Guid.NewGuid().ToString(),
+            ModelId = "simulated",
+            Usage = new UsageDetails
+            {
+                InputTokenCount = userInput.Length / 4,
+                OutputTokenCount = textResponse.Length / 4
+            }
         });
     }
 
-    public async IAsyncEnumerable<string> CompleteStreamAsync(ChatCompletionRequest request, CancellationToken ct)
+    /// <inheritdoc />
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await CompleteAsync(request, ct);
-        foreach (var ch in response.Content)
+        // 直接调用非流式逻辑获取完整响应
+        var lastMessage = messages.LastOrDefault();
+        var userInput = lastMessage?.Text ?? "";
+
+        _logger.LogInformation("SimulatedLLM streaming received: {Input}", userInput[..Math.Min(userInput.Length, 200)]);
+
+        bool functionCalled = false;
+
+        // 尝试匹配 function call（模拟工具调用）
+        foreach (var (name, def) in _knownFunctions)
         {
-            yield return ch.ToString();
+            if (ShouldCallFunction(userInput, name))
+            {
+                var args = ExtractArguments(userInput, name, def.Schema);
+                var argsJson = System.Text.Json.JsonSerializer.Serialize(args);
+                var callId = $"call_{Guid.NewGuid():N}";
+
+                _logger.LogInformation("SimulatedLLM streaming → function_call: {Name}({Args})", name, argsJson);
+
+                // 先发送工具调用
+                var fcContent = new FunctionCallContent(callId, name, new Dictionary<string, object?>(args));
+                yield return new ChatResponseUpdate(ChatRole.Assistant, [fcContent]);
+
+                // 发送工具调用后的文本说明
+                var toolText = $"[模拟工具调用] {name}({argsJson})";
+                foreach (var ch in toolText)
+                    yield return new ChatResponseUpdate(ChatRole.Assistant, ch.ToString());
+
+                functionCalled = true;
+                break;
+            }
+        }
+
+        // 无工具调用时生成普通文本响应
+        if (!functionCalled)
+        {
+            var textResponse = GenerateTextResponse(userInput);
+            foreach (var ch in textResponse)
+                yield return new ChatResponseUpdate(ChatRole.Assistant, ch.ToString());
         }
     }
 
-    public Task<bool> HealthCheckAsync() => Task.FromResult(true);
+    /// <inheritdoc />
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    void IDisposable.Dispose() { }
 
     /// <summary>
     /// 判断用户输入是否应该触发指定函数
     /// </summary>
     private static bool ShouldCallFunction(string input, string functionName)
     {
-        // 简单的关键词匹配
         var keywords = functionName.ToLower().Split('_');
         var inputLower = input.ToLower();
         return keywords.Any(k => inputLower.Contains(k)) ||
@@ -112,10 +159,8 @@ public class SimulatedModelProvider : IModelProvider
     /// </summary>
     private static Dictionary<string, object?> ExtractArguments(string input, string functionName, string schema)
     {
-        // 简单参数提取：从输入中摘取关键信息
         var args = new Dictionary<string, object?>();
 
-        // 提取可能的 query 参数
         if (input.Contains("搜索") || input.Contains("查"))
         {
             var searchIdx = input.IndexOf("搜索");
@@ -135,9 +180,6 @@ public class SimulatedModelProvider : IModelProvider
         return args;
     }
 
-    /// <summary>
-    /// 生成普通文本回复
-    /// </summary>
     private static string GenerateTextResponse(string input)
     {
         if (input.Contains("好") || input.Contains("hello") || input.Contains("你好"))
