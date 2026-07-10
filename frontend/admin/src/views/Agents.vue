@@ -31,7 +31,14 @@
         </el-col>
       </el-row>
       <el-table :data="filteredAgents" v-loading="agentStore.loading" stripe>
-        <el-table-column prop="name" label="名称" min-width="150" />
+        <el-table-column prop="name" label="名称" min-width="150">
+          <template #default="{ row }">
+            <div style="display: flex; align-items: center; gap: 6px">
+              <el-icon :size="16" style="color: #409eff"><Aim /></el-icon>
+              {{ row.name }}
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="modelEndpointName" label="模型" width="150">
           <template #default="{ row }">{{ row.modelEndpointName || row.modelId || '未配置' }}</template>
@@ -70,24 +77,30 @@
           </el-select>
         </el-form-item>
         <el-form-item label="创建者"><el-input v-model="form.createdBy" /></el-form-item>
-        <el-divider content-position="left" style="margin: 12px 0">LLM 参数（可选，留空使用模型默认值）</el-divider>
-        <el-row :gutter="16">
-          <el-col :span="8">
-            <el-form-item label="Temperature">
-              <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="MaxTokens">
-              <el-input-number v-model="form.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="TopP">
-              <el-slider v-model="form.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-collapse style="margin-top: 8px">
+          <el-collapse-item title="LLM 参数（可选，留空使用模型默认值）" name="llm">
+            <el-row :gutter="16">
+              <el-col :span="8">
+                <el-form-item label="Temperature">
+                  <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="MaxTokens">
+                  <el-input-number v-model="form.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="TopP">
+                  <el-slider v-model="form.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-collapse-item>
+        </el-collapse>
+        <el-form-item style="margin-top: 8px; margin-bottom: 0">
+          <el-checkbox v-model="createAndTest">创建后立即进入对话测试</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -119,24 +132,27 @@
                 <el-option label="归档" value="Archived" />
               </el-select>
             </el-form-item>
-            <el-divider content-position="left" style="margin: 12px 0">LLM 参数（留空使用模型默认值）</el-divider>
-            <el-row :gutter="16">
-              <el-col :span="8">
-                <el-form-item label="Temperature">
-                  <el-slider v-model="editForm.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="MaxTokens">
-                  <el-input-number v-model="editForm.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="TopP">
-                  <el-slider v-model="editForm.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+            <el-collapse style="margin-top: 8px">
+              <el-collapse-item title="LLM 参数（留空使用模型默认值）" name="llm-edit">
+                <el-row :gutter="16">
+                  <el-col :span="8">
+                    <el-form-item label="Temperature">
+                      <el-slider v-model="editForm.temperature" :min="0" :max="2" :step="0.1" show-input style="width:100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="MaxTokens">
+                      <el-input-number v-model="editForm.maxTokens" :min="1" :max="128000" :step="100" style="width:100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="TopP">
+                      <el-slider v-model="editForm.topP" :min="0" :max="1" :step="0.05" show-input style="width:100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </el-collapse-item>
+            </el-collapse>
           </el-form>
         </el-tab-pane>
 
@@ -210,11 +226,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAgentStore, type Agent, type AgentSkillBinding, type AgentMcpBinding } from '../stores/agent'
 import { useSkillStore, type Skill } from '../stores/skill'
 import { useModelStore } from '../stores/model'
 import http from '../api/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Aim } from '@element-plus/icons-vue'
 
 const agentStore = useAgentStore()
 const skillStore = useSkillStore()
@@ -249,11 +267,14 @@ const filteredAgents = computed(() => {
   return list
 })
 
+const router = useRouter()
+
 const showDialog = ref(false)
 const showEditDialog = ref(false)
 const creating = ref(false)
 const updating = ref(false)
 const editingId = ref('')
+const createAndTest = ref(false)
 
 const form = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, createdBy: 'admin', temperature: undefined as number | undefined, maxTokens: undefined as number | undefined, topP: undefined as number | undefined })
 const editForm = reactive({ name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null as string | null, status: '', temperature: undefined as number | undefined, maxTokens: undefined as number | undefined, topP: undefined as number | undefined })
@@ -291,10 +312,13 @@ async function handleCreate() {
     if (payload.temperature === undefined) delete payload.temperature
     if (payload.maxTokens === undefined) delete payload.maxTokens
     if (payload.topP === undefined) delete payload.topP
-    await agentStore.create(payload as any)
+    const agent = await agentStore.create(payload as any)
     ElMessage.success('创建成功')
     showDialog.value = false
     Object.assign(form, { name: '', description: '', systemPrompt: '', modelId: '', modelEndpointId: null, createdBy: 'admin', temperature: undefined, maxTokens: undefined, topP: undefined })
+    if (createAndTest.value) {
+      router.push('/chat')
+    }
   } catch {
     ElMessage.error('创建失败')
   } finally {

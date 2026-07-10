@@ -66,7 +66,10 @@
             <el-descriptions-item label="名称">{{ selectedTool.toolName }}</el-descriptions-item>
             <el-descriptions-item label="描述">{{ selectedTool.description || '无描述' }}</el-descriptions-item>
           </el-descriptions>
-          <h4 style="margin: 16px 0 8px">输入 Schema</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px">
+            <h4 style="margin: 0">输入 Schema</h4>
+            <el-button size="small" :icon="CopyDocument" text @click="copySchema(selectedTool.inputSchema)">复制</el-button>
+          </div>
           <el-input
             type="textarea"
             :model-value="formatJson(selectedTool.inputSchema)"
@@ -108,8 +111,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '../api/http'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, CopyDocument } from '@element-plus/icons-vue'
 
 interface McpTool {
   id: string
@@ -184,6 +187,15 @@ function handleNodeClick(node: TreeNode) {
 
 function formatJson(s: string): string {
   try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
+}
+
+function copySchema(schema: string) {
+  const formatted = formatJson(schema)
+  navigator.clipboard.writeText(formatted).then(() => {
+    ElMessage.success('Schema 已复制')
+  }).catch(() => {
+    ElMessage.warning('复制失败，请手动复制')
+  })
 }
 
 async function fetchDetail() {

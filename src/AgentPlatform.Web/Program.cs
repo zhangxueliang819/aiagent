@@ -2,6 +2,7 @@ using AgentPlatform.Application.Services;
 using AgentPlatform.Core.Interfaces;
 using AgentPlatform.Infrastructure.Data;
 using AgentPlatform.Infrastructure.Repositories;
+using AgentPlatform.Infrastructure.Services;
 using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.AgentEngine.Runtime;
@@ -11,6 +12,7 @@ using AgentPlatform.ModelProviders.Simulated;
 using AgentPlatform.Web.Controllers;
 using AgentPlatform.Web.Hubs;
 using AgentPlatform.Web.Middleware;
+using AgentPlatform.Core.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -76,6 +78,8 @@ try
 
     // Background Services
     builder.Services.AddHostedService<SessionCleanupService>();
+    builder.Services.AddSingleton<DatabaseSnapshotService>();
+    builder.Services.AddHostedService<DatabaseSnapshotService>(sp => sp.GetRequiredService<DatabaseSnapshotService>());
 
     // MCP Client
     builder.Services.AddHttpClient<McpClient>();
@@ -105,7 +109,8 @@ try
 
     // JWT Authentication
     var jwtSection = builder.Configuration.GetSection("Jwt");
-    var jwtKey = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
+    var jwtKey = jwtSection["Key"] ?? "AgentPlatform_SuperSecret_Key_2024_Must_Be_At_Least_32_Chars!";
+    var jwtKeyBytes = Encoding.UTF8.GetBytes(jwtKey);
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -121,7 +126,7 @@ try
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSection["Issuer"],
             ValidAudience = jwtSection["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(jwtKey)
+            IssuerSigningKey = new SymmetricSecurityKey(jwtKeyBytes)
         };
         // SignalR 支持从 QueryString 读取 Token
         options.Events = new JwtBearerEvents
@@ -169,7 +174,46 @@ try
         db.Database.EnsureCreated();
     }
 
-    Log.Information("Agent Platform API starting...");
+    // 从快照恢复数据（如果存在）
+    var snapshotSvc = app.Services.GetRequiredService<DatabaseSnapshotService>();
+    var restored = await snapshotSvc.TryLoadSnapshotAsync();
+    if (!restored)
+    {
+        // 首次启动，手动创建种子数据（替代 HasData）
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AgentPlatformDbContext>();
+            if (!await db.ModelProviders.AnyAsync())
+            {
+                db.ModelProviders.Add(new ModelProvider
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
+                    Name = "OpenAI Default",
+                    ProviderType = "OpenAI",
+                    ApiBaseUrl = "https://api.openai.com/v1",
+                    CreatedAt = DateTime.UtcNow
+                });
+                db.ModelEndpoints.Add(new ModelEndpoint
+                {
+                    Id = Guid.Parse("20000000-0000-0000-0000-000000000001"),
+                    ModelProviderId = Guid.Parse("10000000-0000-0000-0000-000000000001"),
+                    ModelId = "gpt-4o",
+                    ModelName = "GPT-4o",
+                    MaxTokens = 128000,
+                    IsEnabled = true
+                });
+                await db.SaveChangesAsync();
+                Log.Information("默认种子数据已创建");
+            }
+        }
+    }
+
+    // 输出运行地址
+    var urls = app.Urls.Any()
+        ? string.Join(", ", app.Urls)
+        : "http://localhost:5000";
+    Log.Information("Agent Platform API 已启动，监听地址: {Urls}", urls);
+    Log.Information("Swagger UI: {Url}/swagger", app.Urls.FirstOrDefault() ?? "http://localhost:5000");
     app.Run();
 }
 catch (Exception ex)

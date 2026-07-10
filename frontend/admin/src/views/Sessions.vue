@@ -4,11 +4,30 @@
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center">
           <span>会话记录</span>
-          <el-button type="primary" @click="loadSessions">刷新</el-button>
+          <div style="display: flex; gap: 8px">
+            <el-button v-if="selectedIds.length > 0" type="danger" size="small" @click="handleBatchDelete">
+              批量删除 ({{ selectedIds.length }})
+            </el-button>
+            <el-button size="small" @click="handleExport">导出</el-button>
+            <el-button type="primary" size="small" @click="loadSessions">刷新</el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="sessions" stripe style="width: 100%" @row-click="openDetail" v-loading="loading">
+      <el-row :gutter="16" style="margin-bottom: 16px">
+        <el-col :span="8">
+          <el-input v-model="searchQuery" placeholder="搜索会话标题…" clearable prefix-icon="Search" />
+        </el-col>
+      </el-row>
+
+      <el-table
+        :data="filteredSessions"
+        stripe style="width: 100%"
+        @row-click="openDetail"
+        v-loading="loading"
+        @selection-change="onSelectionChange"
+      >
+        <el-table-column type="selection" width="40" />
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <el-link type="primary" @click.stop="openDetail(row)">{{ row.title || '新会话' }}</el-link>
@@ -88,8 +107,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
 interface SessionItem {
@@ -114,6 +133,43 @@ const loading = ref(false)
 const showDetail = ref(false)
 const selectedSession = ref<SessionItem | null>(null)
 const sessionMessages = ref<ConversationMsg[]>([])
+
+// 搜索 & 批量
+const searchQuery = ref('')
+const selectedIds = ref<string[]>([])
+
+const filteredSessions = computed(() => {
+  if (!searchQuery.value) return sessions.value
+  const q = searchQuery.value.toLowerCase()
+  return sessions.value.filter(s => (s.title || '').toLowerCase().includes(q))
+})
+
+function onSelectionChange(rows: SessionItem[]) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handleBatchDelete() {
+  if (selectedIds.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(`确认删除选中的 ${selectedIds.value.length} 条会话？`, '提示', { type: 'warning' })
+    await Promise.all(selectedIds.value.map(id => http.delete(`/sessions/${id}`)))
+    ElMessage.success(`成功删除 ${selectedIds.value.length} 条会话`)
+    selectedIds.value = []
+    await loadSessions()
+  } catch { /* cancelled */ }
+}
+
+function handleExport() {
+  const jsonStr = JSON.stringify(sessions.value, null, 2)
+  const blob = new Blob([jsonStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `sessions-export-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('会话已导出')
+}
 
 async function loadSessions() {
   loading.value = true

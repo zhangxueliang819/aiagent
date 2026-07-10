@@ -127,25 +127,6 @@ public class AgentPlatformDbContext : DbContext
             e.HasIndex(x => x.Username).IsUnique();
         });
 
-        // Seed default data
-        modelBuilder.Entity<ModelProvider>().HasData(new ModelProvider
-        {
-            Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
-            Name = "OpenAI Default",
-            ProviderType = "OpenAI",
-            ApiBaseUrl = "https://api.openai.com/v1",
-            EncryptedApiKey = "",
-            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-        });
-
-        modelBuilder.Entity<ModelEndpoint>().HasData(new ModelEndpoint
-        {
-            Id = Guid.Parse("20000000-0000-0000-0000-000000000001"),
-            ModelProviderId = Guid.Parse("10000000-0000-0000-0000-000000000001"),
-            ModelId = "gpt-4o",
-            ModelName = "GPT-4o",
-            MaxTokens = 128000,
-            IsEnabled = true
-        });
+        // Seed default data is now handled in Program.cs via DatabaseSnapshotService
     }
 }

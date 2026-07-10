@@ -34,7 +34,16 @@
           </template>
         </el-table-column>
         <el-table-column prop="name" label="名称" min-width="150" />
-        <el-table-column prop="providerType" label="类型" width="120" />
+        <el-table-column prop="providerType" label="类型" width="120">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.providerType === 'OpenAI' ? 'primary' : row.providerType === 'Azure' ? 'warning' : 'info'"
+              size="small"
+            >
+              {{ row.providerType }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="apiBaseUrl" label="API 地址" min-width="250" show-overflow-tooltip />
         <el-table-column label="端点数量" width="100">
           <template #default="{ row }">{{ row.endpoints?.length || 0 }}</template>
@@ -44,8 +53,9 @@
             <el-tag :type="row.isEnabled ? 'success' : 'danger'">{{ row.isEnabled ? '启用' : '禁用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="260">
           <template #default="{ row }">
+            <el-button size="small" type="primary" link @click="handleTestConnection(row)">测试连接</el-button>
             <el-button size="small" type="primary" link @click="openProviderEditDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" link @click="handleDeleteProvider(row.id)">删除</el-button>
           </template>
@@ -54,7 +64,7 @@
     </el-card>
 
     <!-- 添加/编辑供应商对话框 -->
-    <el-dialog v-model="showProviderDialog" :title="isEditingProvider ? '编辑模型供应商' : '添加模型供应商'" width="500px" @closed="resetProviderForm">
+    <el-dialog v-model="showProviderDialog" :title="isEditingProvider ? '编辑模型供应商' : '添加模型供应商'" width="520px" @closed="resetProviderForm">
       <el-form :model="providerForm" label-width="100px">
         <el-form-item label="名称" required><el-input v-model="providerForm.name" /></el-form-item>
         <el-form-item label="类型"><el-input v-model="providerForm.providerType" placeholder="OpenAI" /></el-form-item>
@@ -87,6 +97,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useModelStore, type ModelProvider, type ModelEndpoint } from '../stores/model'
+import http from '../api/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const modelStore = useModelStore()
@@ -157,6 +168,17 @@ async function handleSubmitProvider() {
     ElMessage.error(isEditingProvider.value ? '更新失败' : '添加失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function handleTestConnection(provider: ModelProvider) {
+  try {
+    ElMessage.info(`正在测试 ${provider.name} 的连接...`)
+    await http.post(`/models/${provider.id}/test`)
+    ElMessage.success(`${provider.name} 连接测试通过`)
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || '连接失败'
+    ElMessage.error(`${provider.name} 连接测试失败: ${msg}`)
   }
 }
 

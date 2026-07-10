@@ -1,9 +1,17 @@
 <template>
-  <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f2f5">
-    <el-card style="width: 400px; padding: 20px">
-      <div style="text-align: center; margin-bottom: 30px">
-        <h1 style="font-size: 28px; margin-bottom: 8px">🤖 Agent Platform</h1>
-        <p style="color: #999; margin: 0">管理后台登录</p>
+  <div class="login-page">
+    <!-- 背景装饰 -->
+    <div class="login-bg">
+      <div class="bg-circle bg-circle-1" />
+      <div class="bg-circle bg-circle-2" />
+      <div class="bg-circle bg-circle-3" />
+    </div>
+
+    <el-card class="login-card" shadow="xl">
+      <div class="login-header">
+        <div class="login-logo">🤖</div>
+        <h1 class="login-title">Agent Platform</h1>
+        <p class="login-subtitle">管理后台登录</p>
       </div>
 
       <el-form
@@ -11,6 +19,7 @@
         :model="form"
         :rules="rules"
         label-position="top"
+        class="login-form"
         @keyup.enter="handleLogin"
       >
         <el-form-item label="用户名" prop="username">
@@ -37,7 +46,7 @@
           <el-button
             type="primary"
             size="large"
-            style="width: 100%"
+            style="width: 100%; height: 44px; font-size: 16px"
             :loading="loading"
             @click="handleLogin"
           >
@@ -45,8 +54,8 @@
           </el-button>
         </el-form-item>
 
-        <div style="text-align: center; font-size: 13px; color: #999">
-          <p style="margin: 4px 0">测试账号：admin / admin123</p>
+        <div class="login-footer">
+          <p>测试账号：admin / admin123</p>
         </div>
       </el-form>
     </el-card>
@@ -93,3 +102,104 @@ async function handleLogin() {
   }
 }
 </script>
+
+<style scoped>
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  animation: float 8s ease-in-out infinite;
+}
+
+.bg-circle-1 {
+  width: 400px;
+  height: 400px;
+  top: -100px;
+  right: -100px;
+  animation-delay: 0s;
+}
+
+.bg-circle-2 {
+  width: 300px;
+  height: 300px;
+  bottom: -50px;
+  left: -80px;
+  animation-delay: 2s;
+}
+
+.bg-circle-3 {
+  width: 200px;
+  height: 200px;
+  top: 40%;
+  left: 60%;
+  animation-delay: 4s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-20px) scale(1.05); }
+}
+
+.login-card {
+  width: 400px;
+  border-radius: 12px;
+  z-index: 1;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.login-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  transition: color var(--transition-normal);
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 14px;
+  transition: color var(--transition-normal);
+}
+
+.login-form {
+  margin-top: 8px;
+}
+
+.login-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: color var(--transition-normal);
+}
+
+.login-footer p {
+  margin: 4px 0;
+}
+</style>
+

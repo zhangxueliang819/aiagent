@@ -23,7 +23,11 @@
                 </el-table-column>
                 <el-table-column label="状态" width="80">
                   <template #default="{ row: tool }">
-                    <el-tag :type="tool.isEnabled ? 'success' : 'info'" size="small">{{ tool.isEnabled ? '启用' : '禁用' }}</el-tag>
+                    <el-switch
+                      v-model="tool.isEnabled"
+                      size="small"
+                      @change="(val: boolean) => handleToggleTool(row.id, tool.id, val)"
+                    />
                   </template>
                 </el-table-column>
               </el-table>
@@ -32,8 +36,27 @@
           </template>
         </el-table-column>
         <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column prop="endpointUrl" label="端点 URL" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="protocol" label="协议" width="80" />
+        <el-table-column prop="endpointUrl" label="端点 URL" min-width="250" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div style="display: flex; align-items: center; gap: 4px">
+              <code style="flex: 1; overflow: hidden; text-overflow: ellipsis">{{ row.endpointUrl }}</code>
+              <el-tooltip content="复制 URL">
+                <el-button size="small" link :icon="CopyDocument" @click.stop="copyUrl(row.endpointUrl)" />
+              </el-tooltip>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="protocol" label="协议" width="80">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.protocol === 'sse' ? 'primary' : 'info'"
+              size="small"
+              effect="plain"
+            >
+              {{ row.protocol?.toUpperCase() }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="工具数" width="80">
           <template #default="{ row }">{{ row.tools?.length || 0 }}</template>
         </el-table-column>
@@ -83,6 +106,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import http from '../api/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { CopyDocument } from '@element-plus/icons-vue'
 
 interface McpTool {
   id: string
@@ -185,6 +209,24 @@ async function handleDelete(id: string) {
     ElMessage.success('删除成功')
     await fetchAll()
   } catch { /* cancelled */ }
+}
+
+function copyUrl(url: string) {
+  navigator.clipboard.writeText(url).then(() => {
+    ElMessage.success('URL 已复制')
+  }).catch(() => {
+    ElMessage.warning('复制失败，请手动复制')
+  })
+}
+
+async function handleToggleTool(endpointId: string, toolId: string, isEnabled: boolean) {
+  try {
+    await http.put(`/McpEndpoints/${endpointId}/tools/${toolId}`, { isEnabled })
+    ElMessage.success(isEnabled ? '工具已启用' : '工具已禁用')
+  } catch {
+    ElMessage.error('操作失败')
+    await fetchAll()
+  }
 }
 
 async function handleDiscover(id: string) {

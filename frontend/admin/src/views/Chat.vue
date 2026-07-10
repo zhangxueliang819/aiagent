@@ -2,9 +2,12 @@
   <el-container style="height: calc(100vh - 120px)">
     <!-- 左侧：会话列表 -->
     <el-aside width="260px" style="background: #fff; border-right: 1px solid #e6e6e6; overflow-y: auto">
-      <div style="padding: 12px">
+      <div style="padding: 12px; display: flex; flex-direction: column; gap: 8px">
         <el-button type="primary" style="width: 100%" @click="createNewSession" :icon="Plus">
           新建会话
+        </el-button>
+        <el-button style="width: 100%" @click="handleClearMessages" :disabled="messages.length === 0" :icon="Delete">
+          清空消息
         </el-button>
       </div>
       <el-menu :default-active="activeSessionId" @select="switchSession">
@@ -55,9 +58,18 @@
               <div v-if="msg.isStreaming" style="font-style: italic; color: #999">正在输入...</div>
               <div v-else style="white-space: pre-wrap">{{ msg.content }}</div>
             </div>
-            <span v-if="msg.tokenCount" style="font-size: 11px; color: #bbb; margin-top: 4px; margin-left: 4px">
-              {{ msg.tokenCount }} tokens
-            </span>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; margin-left: 4px">
+              <span v-if="msg.tokenCount" style="font-size: 11px; color: #bbb">
+                {{ msg.tokenCount }} tokens
+              </span>
+              <template v-if="!msg.isStreaming && msg.content">
+                <el-button size="small" text :icon="CopyDocument" @click="copyText(msg.content)">复制</el-button>
+                <el-button
+                  v-if="idx === messages.length - 1"
+                  size="small" text :icon="Refresh" @click="regenerateLast"
+                >重新生成</el-button>
+              </template>
+            </div>
           </div>
 
           <!-- 工具调用消息 -->
@@ -116,15 +128,21 @@
               </el-option>
             </el-select>
           </div>
-          <el-input
-            v-model="inputMessage"
-            type="textarea"
-            :rows="2"
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            resize="none"
-            :disabled="isStreaming"
-            @keydown.enter.exact.prevent="sendMessage"
-          />
+          <div style="flex: 1; position: relative">
+            <el-input
+              v-model="inputMessage"
+              type="textarea"
+              :rows="2"
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+              resize="none"
+              :disabled="isStreaming"
+              :maxlength="4000"
+              @keydown.enter.exact.prevent="sendMessage"
+            />
+            <div style="position: absolute; right: 10px; bottom: 4px; font-size: 11px; color: #bbb; pointer-events: none">
+              {{ inputMessage.length }}/4000
+            </div>
+          </div>
           <el-button
             type="primary"
             :icon="Promotion"
@@ -144,7 +162,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Plus, Promotion, ChatDotSquare, Loading, Tools } from '@element-plus/icons-vue'
+import { Plus, Promotion, ChatDotSquare, Loading, Tools, Delete, CopyDocument, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
@@ -243,6 +261,30 @@ async function loadSessions() {
     })) : []
   } catch (e) {
     console.error('加载会话列表失败', e)
+  }
+}
+
+function copyText(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success('已复制')
+  }).catch(() => {
+    ElMessage.warning('复制失败')
+  })
+}
+
+function handleClearMessages() {
+  messages.value = []
+  memoryTokens.value = 0
+  ElMessage.success('消息已清空')
+}
+
+function regenerateLast() {
+  // 找到最后一条用户消息重新发送
+  const lastUserMsg = [...messages.value].reverse().find(m => m.role === 'user')
+  if (lastUserMsg) {
+    messages.value = messages.value.slice(0, messages.value.length - 1)
+    inputMessage.value = lastUserMsg.content
+    sendMessage()
   }
 }
 

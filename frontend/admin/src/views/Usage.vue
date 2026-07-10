@@ -3,7 +3,7 @@
     <!-- 顶部筛选栏 -->
     <el-card shadow="never" class="filter-card">
       <el-row :gutter="16" align="middle">
-        <el-col :span="8">
+        <el-col :xs="12" :sm="8" :md="6">
           <el-date-picker
             v-model="dateRange"
             type="daterange"
@@ -12,10 +12,24 @@
             end-placeholder="结束日期"
             value-format="YYYY-MM-DD"
             @change="loadData"
+            style="width: 100%"
           />
         </el-col>
-        <el-col :span="4">
-          <el-button type="primary" @click="loadData" :loading="loading">刷新</el-button>
+        <el-col :xs="12" :sm="5" :md="4">
+          <el-select v-model="agentFilter" placeholder="全部 Agent" clearable style="width: 100%" @change="loadData">
+            <el-option
+              v-for="a in agentOptions"
+              :key="a.id"
+              :label="a.name"
+              :value="a.id"
+            />
+          </el-select>
+        </el-col>
+        <el-col :xs="12" :sm="5" :md="4">
+          <div style="display: flex; gap: 8px">
+            <el-button type="primary" @click="loadData" :loading="loading">刷新</el-button>
+            <el-button @click="handleExportCSV">导出 CSV</el-button>
+          </div>
         </el-col>
       </el-row>
     </el-card>
@@ -74,8 +88,13 @@
 
     <!-- 用量明细表格 -->
     <el-card shadow="never">
-      <template #header>用量明细</template>
-      <el-table :data="records" v-loading="loading" stripe style="width: 100%">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span>用量明细</span>
+          <el-tag type="info" size="small">{{ records.length }} 条记录</el-tag>
+        </div>
+      </template>
+      <el-table :data="paginatedRecords" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="modelId" label="模型" width="140" />
         <el-table-column label="输入 Token" width="120">
           <template #default="{ row }">{{ row.inputTokens.toLocaleString() }}</template>
@@ -90,6 +109,16 @@
           <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString() }}</template>
         </el-table-column>
       </el-table>
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="records.length"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next"
+          small
+        />
+      </div>
     </el-card>
   </div>
 </template>
@@ -99,6 +128,7 @@ import { ref, computed, onMounted } from 'vue'
 import http from '../api/http'
 import VChart from 'vue-echarts'
 import 'echarts'
+import { ElMessage } from 'element-plus'
 
 interface UsageDailyDto {
   date: string
@@ -139,6 +169,19 @@ const summary = ref<UsageSummaryDto>({
 const dailyData = ref<UsageDailyDto[]>([])
 const records = ref<UsageRecordDto[]>([])
 
+// Agent 筛选
+const agentFilter = ref('')
+const agentOptions = ref<{ id: string; name: string }[]>([])
+
+// 分页
+const page = ref(1)
+const pageSize = ref(20)
+
+const paginatedRecords = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return records.value.slice(start, start + pageSize.value)
+})
+
 function getDefaultFrom(): string {
   const d = new Date()
   d.setDate(d.getDate() - 30)
@@ -152,14 +195,19 @@ async function loadData() {
   loading.value = true
   try {
     const [from, to] = dateRange.value
-    const [summaryRes, dailyRes, recordsRes] = await Promise.all([
-      http.get<ApiResponse<UsageSummaryDto>>('/usage/summary', { params: { from, to } }),
-      http.get<ApiResponse<UsageDailyDto[]>>('/usage/daily', { params: { from, to } }),
-      http.get<ApiResponse<UsageRecordDto[]>>('/usage', { params: { from, to } }),
+    const params: any = { from, to }
+    if (agentFilter.value) params.agentId = agentFilter.value
+
+    const [summaryRes, dailyRes, recordsRes, agentRes] = await Promise.all([
+      http.get<ApiResponse<UsageSummaryDto>>('/usage/summary', { params }),
+      http.get<ApiResponse<UsageDailyDto[]>>('/usage/daily', { params }),
+      http.get<ApiResponse<UsageRecordDto[]>>('/usage', { params }),
+      http.get<{ data: { id: string; name: string }[] }>('/agents').catch(() => null),
     ])
     if (summaryRes.data.success) summary.value = summaryRes.data.data!
     if (dailyRes.data.success) dailyData.value = dailyRes.data.data!
     if (recordsRes.data.success) records.value = recordsRes.data.data!
+    if (agentRes?.data?.data) agentOptions.value = agentRes.data.data.map((a: any) => ({ id: a.id, name: a.name }))
   } finally {
     loading.value = false
   }
@@ -218,6 +266,30 @@ const pieChartOption = computed(() => {
   }
 })
 
+function handleExportCSV() {
+  if (records.value.length === 0) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  const headers = ['模型', '输入 Token', '输出 Token', '费用', '时间']
+  const rows = records.value.map(r => [
+    r.modelId,
+    r.inputTokens.toString(),
+    r.outputTokens.toString(),
+    r.cost.toFixed(4),
+    new Date(r.createdAt).toISOString()
+  ])
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `usage-export-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('CSV 已导出')
+}
+
 onMounted(loadData)
 </script>
 
@@ -249,9 +321,3 @@ onMounted(loadData)
   color: #303133;
 }
 </style>
-<template>
-  <el-card>
-    <template #header>用量统计</template>
-    <el-empty description="用量统计功能将在 Phase 2 中实现" :image-size="120" />
-  </el-card>
-</template>

@@ -1,0 +1,291 @@
+:root {
+  --color-primary-50: #ecf5ff;
+  --color-primary-100: #d9ecff;
+  --color-primary-200: #b3d8ff;
+  --color-primary-300: #80b9ff;
+  --color-primary-400: #4da6ff;
+  --color-primary-500: #409eff;
+  --color-primary-600: #3a8eee;
+  --color-primary-700: #337ce8;
+  --color-primary-800: #2b6cd1;
+  --color-primary-900: #1d53b8;
+
+  --color-secondary-blue: #667eea;
+  --color-secondary-purple: #764ba2;
+  --color-secondary-teal: #11998e;
+
+  --color-success: #67c23a;
+  --color-success-light: #f0f9eb;
+  --color-warning: #e6a23c;
+  --color-warning-light: #fdf6ec;
+  --color-danger: #f56c6c;
+  --color-danger-light: #fef0f0;
+  --color-info: #909399;
+  --color-info-light: #f4f4f5;
+
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #f0f2f5;
+  --color-gray-300: #e4e7ed;
+  --color-gray-400: #d9d9d9;
+  --color-gray-500: #c0c4cc;
+  --color-gray-600: #909399;
+  --color-gray-700: #606266;
+  --color-gray-800: #303133;
+  --color-gray-900: #1a1a1a;
+
+  /* ── 现代侧栏（浅色） ───────────────────────────── */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #4a5568;
+  --sidebar-text-secondary: #909399;
+  --sidebar-active-text: #409eff;
+  --sidebar-active-bg: #ecf5ff;
+  --sidebar-hover-bg: #f7fafc;
+  --sidebar-border: #e2e8f0;
+  --sidebar-logo-color: #1a202c;
+  --sidebar-collapse-btn-color: #909399;
+  --sidebar-collapse-btn-hover-bg: #f0f2f5;
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 64px;
+
+  /* ── 全局（浅色） ──────────────────────────────── */
+  --bg-page: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-header: #ffffff;
+  --text-primary: #303133;
+  --text-secondary: #606266;
+  --text-muted: #909399;
+  --border-color: #e4e7ed;
+  --border-light: #ebeef5;
+
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-family-mono: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  --font-size-h1: 28px;
+  --font-size-h2: 24px;
+  --font-size-h3: 20px;
+  --font-size-h4: 16px;
+  --font-size-body: 14px;
+  --font-size-small: 13px;
+  --font-size-caption: 12px;
+  --font-size-micro: 11px;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-h1: 1.3;
+  --line-height-h2: 1.4;
+  --line-height-h3: 1.4;
+  --line-height-body: 1.6;
+  --line-height-small: 1.6;
+  --line-height-caption: 1.5;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 40px;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.16);
+
+  --icon-size-xs: 12px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+  --icon-size-2xl: 48px;
+
+  --layout-header-height: 56px;
+  --layout-content-padding: 20px;
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-duration: 0.2s;
+  --transition-timing: ease;
+
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-notification: 1080;
+  --z-index-loading: 1090;
+}
+
+/* ── 深色模式 ────────────────────────────────────── */
+.dark {
+  --color-gray-50: #1a1a1a;
+  --color-gray-100: #1e1e1e;
+  --color-gray-200: #252525;
+  --color-gray-300: #333333;
+  --color-gray-400: #555555;
+  --color-gray-500: #777777;
+  --color-gray-600: #999999;
+  --color-gray-700: #bbbbbb;
+  --color-gray-800: #dddddd;
+  --color-gray-900: #ffffff;
+
+  --color-primary-50: #1a2744;
+  --color-primary-100: #1a3a6b;
+
+  /* ── 现代侧栏（深色渐变） ────────────────────── */
+  --sidebar-bg: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  --sidebar-text: #a0aec0;
+  --sidebar-text-secondary: #718096;
+  --sidebar-active-text: #60a5fa;
+  --sidebar-active-bg: rgba(96, 165, 250, 0.12);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-logo-color: #ffffff;
+  --sidebar-collapse-btn-color: #718096;
+  --sidebar-collapse-btn-hover-bg: rgba(255, 255, 255, 0.08);
+
+  /* ── 全局（深色） ──────────────────────────────── */
+  --bg-page: #121212;
+  --bg-card: #1e1e1e;
+  --bg-header: #1e1e1e;
+  --text-primary: #dddddd;
+  --text-secondary: #bbbbbb;
+  --text-muted: #777777;
+  --border-color: #333333;
+  --border-light: #2a2a2a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+:root {
+  --color-primary-50: #ecf5ff;
+  --color-primary-100: #d9ecff;
+  --color-primary-200: #b3d8ff;
+  --color-primary-300: #80b9ff;
+  --color-primary-400: #4da6ff;
+  --color-primary-500: #409eff;
+  --color-primary-600: #3a8eee;
+  --color-primary-700: #337ce8;
+  --color-primary-800: #2b6cd1;
+  --color-primary-900: #1d53b8;
+
+  --color-secondary-blue: #667eea;
+  --color-secondary-purple: #764ba2;
+  --color-secondary-teal: #11998e;
+
+  --color-success: #67c23a;
+  --color-success-light: #f0f9eb;
+  --color-warning: #e6a23c;
+  --color-warning-light: #fdf6ec;
+  --color-danger: #f56c6c;
+  --color-danger-light: #fef0f0;
+  --color-info: #909399;
+  --color-info-light: #f4f4f5;
+
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #f0f2f5;
+  --color-gray-300: #e4e7ed;
+  --color-gray-400: #d9d9d9;
+  --color-gray-500: #c0c4cc;
+  --color-gray-600: #909399;
+  --color-gray-700: #606266;
+  --color-gray-800: #303133;
+  --color-gray-900: #1a1a1a;
+
+  --color-sidebar-bg: #304156;
+  --color-sidebar-text: #bfcbd9;
+  --color-sidebar-active: #409eff;
+  --color-sidebar-hover: #263445;
+
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-family-mono: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  --font-size-h1: 28px;
+  --font-size-h2: 24px;
+  --font-size-h3: 20px;
+  --font-size-h4: 16px;
+  --font-size-body: 14px;
+  --font-size-small: 13px;
+  --font-size-caption: 12px;
+  --font-size-micro: 11px;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-h1: 1.3;
+  --line-height-h2: 1.4;
+  --line-height-h3: 1.4;
+  --line-height-body: 1.6;
+  --line-height-small: 1.6;
+  --line-height-caption: 1.5;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 40px;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.16);
+
+  --icon-size-xs: 12px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+  --icon-size-2xl: 48px;
+
+  --layout-header-height: 60px;
+  --layout-sidebar-width: 220px;
+  --layout-sidebar-collapsed-width: 64px;
+  --layout-content-padding: 20px;
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-duration: 0.2s;
+  --transition-timing: ease;
+
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-notification: 1080;
+  --z-index-loading: 1090;
+}
