@@ -1,8 +1,9 @@
 <template>
   <div>
     <el-card>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-        <h3 style="margin:0">模型供应商</h3>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px">
+        <span style="font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; padding-left: 10px; border-left: 3px solid var(--el-color-primary); line-height: 1.2">模型供应商</span>
+        <div style="flex: 1" />
         <el-button type="primary" @click="openProviderDialog()">添加供应商</el-button>
       </div>
       <el-table :data="modelStore.providers" v-loading="modelStore.loading" stripe row-key="id">

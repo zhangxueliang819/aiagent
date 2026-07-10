@@ -1,22 +1,18 @@
 <template>
   <div>
     <el-card>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-        <h3 style="margin:0">技能列表</h3>
-        <el-button type="primary" @click="openDialog()">创建技能</el-button>
-      </div>
-      <el-row :gutter="16" style="margin-bottom: 16px">
-        <el-col :span="8">
-          <el-input v-model="searchQuery" placeholder="搜索技能名称…" clearable prefix-icon="Search" />
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="typeFilter" placeholder="类型筛选" clearable style="width:100%">
+      <!-- 工具栏：搜索 + 筛选 + 操作按钮 -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1">
+          <el-input v-model="searchQuery" placeholder="搜索技能名称…" clearable prefix-icon="Search" style="max-width: 220px" />
+          <el-select v-model="typeFilter" placeholder="类型筛选" clearable style="width: 120px">
             <el-option label="Tool" value="Tool" />
             <el-option label="Api" value="Api" />
             <el-option label="Script" value="Script" />
           </el-select>
-        </el-col>
-      </el-row>
+        </div>
+        <el-button type="primary" @click="openDialog()">创建技能</el-button>
+      </div>
       <el-table :data="filteredSkills" v-loading="skillStore.loading" stripe>
         <el-table-column prop="name" label="名称" min-width="150" />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />

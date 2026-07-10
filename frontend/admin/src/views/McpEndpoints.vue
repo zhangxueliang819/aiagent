@@ -1,8 +1,9 @@
 <template>
   <div>
     <el-card>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-        <h3 style="margin:0">MCP 端点管理</h3>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px">
+        <span style="font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; padding-left: 10px; border-left: 3px solid var(--el-color-primary); line-height: 1.2">MCP 端点</span>
+        <div style="flex: 1" />
         <el-button type="primary" @click="openDialog()">添加端点</el-button>
       </div>
       <el-table :data="endpoints" v-loading="loading" stripe row-key="id">

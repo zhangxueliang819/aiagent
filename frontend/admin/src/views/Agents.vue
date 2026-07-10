@@ -1,17 +1,11 @@
 <template>
   <div>
     <el-card>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px">
-        <h3 style="margin:0">Agent 列表</h3>
-        <el-button type="primary" @click="showDialog = true">创建 Agent</el-button>
-      </div>
-      <!-- 搜索/过滤栏 -->
-      <el-row :gutter="16" style="margin-bottom: 16px">
-        <el-col :span="8">
-          <el-input v-model="searchQuery" placeholder="搜索 Agent 名称…" clearable prefix-icon="Search" />
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width:100%">
+      <!-- 工具栏：搜索 + 筛选 + 操作按钮 -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1">
+          <el-input v-model="searchQuery" placeholder="搜索 Agent 名称…" clearable prefix-icon="Search" style="max-width: 220px" />
+          <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px">
             <el-option label="草稿" value="Draft" />
             <el-option label="活跃" value="Active" />
             <el-option label="运行中" value="Running" />
@@ -20,16 +14,15 @@
             <el-option label="停用" value="Inactive" />
             <el-option label="已归档" value="Archived" />
           </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="sortBy" placeholder="排序" style="width:100%">
+          <el-select v-model="sortBy" placeholder="排序" style="width: 110px">
             <el-option label="创建时间(新→旧)" value="createdAt_desc" />
             <el-option label="创建时间(旧→新)" value="createdAt_asc" />
             <el-option label="名称(A→Z)" value="name_asc" />
             <el-option label="名称(Z→A)" value="name_desc" />
           </el-select>
-        </el-col>
-      </el-row>
+        </div>
+        <el-button type="primary" @click="showDialog = true">创建 Agent</el-button>
+      </div>
       <el-table :data="filteredAgents" v-loading="agentStore.loading" stripe>
         <el-table-column prop="name" label="名称" min-width="150">
           <template #default="{ row }">

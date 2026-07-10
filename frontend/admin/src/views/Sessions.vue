@@ -1,24 +1,17 @@
 <template>
   <div>
     <el-card>
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center">
-          <span>会话记录</span>
-          <div style="display: flex; gap: 8px">
-            <el-button v-if="selectedIds.length > 0" type="danger" size="small" @click="handleBatchDelete">
-              批量删除 ({{ selectedIds.length }})
-            </el-button>
-            <el-button size="small" @click="handleExport">导出</el-button>
-            <el-button type="primary" size="small" @click="loadSessions">刷新</el-button>
-          </div>
+      <!-- 工具栏：搜索 + 操作按钮 -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1">
+          <el-input v-model="searchQuery" placeholder="搜索会话标题…" clearable prefix-icon="Search" style="max-width: 220px" />
         </div>
-      </template>
-
-      <el-row :gutter="16" style="margin-bottom: 16px">
-        <el-col :span="8">
-          <el-input v-model="searchQuery" placeholder="搜索会话标题…" clearable prefix-icon="Search" />
-        </el-col>
-      </el-row>
+        <el-button v-if="selectedIds.length > 0" type="danger" @click="handleBatchDelete">
+          批量删除 ({{ selectedIds.length }})
+        </el-button>
+        <el-button @click="handleExport">导出</el-button>
+        <el-button type="primary" @click="loadSessions">刷新</el-button>
+      </div>
 
       <el-table
         :data="filteredSessions"
