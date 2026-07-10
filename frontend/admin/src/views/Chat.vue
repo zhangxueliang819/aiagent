@@ -90,8 +90,8 @@
               <div v-if="msg.content" style="white-space: pre-wrap">{{ msg.content }}</div>
               <div v-else-if="msg.isStreaming" style="font-style: italic; color: var(--text-muted)">正在思考...</div>
               <!-- 模型元信息 -->
-              <div v-if="!msg.isStreaming && msg.modelName" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap">
-                <span>模型: {{ msg.modelName }}</span>
+              <div v-if="!msg.isStreaming" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-light); font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap">
+                <span v-if="msg.modelName">模型: {{ msg.modelName }}</span>
                 <span v-if="msg.inputTokens != null">输入: {{ msg.inputTokens }} tokens</span>
                 <span v-if="msg.outputTokens != null">输出: {{ msg.outputTokens }} tokens</span>
               </div>

@@ -180,6 +180,7 @@ public class AgentRuntimeFactory
         string? modelName = null;
         var toolCalls = new List<ToolCallInfo>();
         bool streamHadContent = false;
+        bool usageReceived = false;
 
         await foreach (var update in chatClient.GetStreamingResponseAsync(messages, options, ct))
         {
@@ -224,6 +225,7 @@ public class AgentRuntimeFactory
             if (update.AdditionalProperties?.TryGetValue("usage", out var usageObj) == true
                 && usageObj is System.Text.Json.JsonElement usageElem)
             {
+                usageReceived = true;
                 if (usageElem.TryGetProperty("prompt_tokens", out var pt))
                     inputTokens = pt.GetInt32();
                 if (usageElem.TryGetProperty("completion_tokens", out var ct2))
@@ -276,6 +278,32 @@ public class AgentRuntimeFactory
             modelName ??= response.ModelId;
             inputTokens = (int)(response.Usage?.InputTokenCount ?? 0);
             outputTokens = (int)(response.Usage?.OutputTokenCount ?? 0);
+            usageReceived = true;
+        }
+
+        // 流式未提供 usage 时，尝试非流式回退获取 token 统计和模型名
+        if (!usageReceived && agent.ModelEndpointId.HasValue)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "Streaming did not provide usage, fallback to non-streaming for usage of {AgentName}",
+                    agent.Name);
+
+                var fallbackResponse = await chatClient.GetResponseAsync(messages, options, ct);
+                if (fallbackResponse?.Usage != null)
+                {
+                    inputTokens = (int)(fallbackResponse.Usage?.InputTokenCount ?? 0);
+                    outputTokens = (int)(fallbackResponse.Usage?.OutputTokenCount ?? 0);
+                }
+                modelName ??= fallbackResponse?.ModelId;
+                usageReceived = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Non-streaming usage fallback also failed for {AgentName}", agent.Name);
+            }
         }
 
         // 5. 发送完成事件（含聚合元信息）
