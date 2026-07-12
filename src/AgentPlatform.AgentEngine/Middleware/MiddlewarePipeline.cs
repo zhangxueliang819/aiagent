@@ -115,6 +115,24 @@ public class MiddlewarePipeline
             }
         }
     }
+
+    /// <summary>
+    /// 执行 Error 管道（所有中间件的错误处理方法）
+    /// </summary>
+    public async Task ExecuteErrorAsync(AgentMiddlewareContext context, Exception exception, CancellationToken ct)
+    {
+        foreach (var mw in _middlewares)
+        {
+            try
+            {
+                await mw.OnErrorAsync(context, exception, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Middleware {Name} OnError also failed during error handling", mw.Name);
+            }
+        }
+    }
 }
 
 // ============================================================

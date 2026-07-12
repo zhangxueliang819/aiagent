@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using AgentPlatform.Core.Entities;
 using AgentPlatform.Core.Interfaces;
@@ -104,8 +105,7 @@ public class FunctionToolRegistry
 
     /// <summary>
     /// 将 FunctionTool Skill 列表转换为 MAF AIFunction 列表。
-    /// 使用 AIFunctionFactory.Create 自动从委托生成 JSON Schema。
-    /// 若技能名称有对应的已注册执行器，优先使用其描述。
+    /// 使用 InputSchemaJson 作为函数的 JSON Schema，确保模型能看到正确的参数定义。
     /// </summary>
     public async Task<List<AIFunction>> GetAIFunctionsForAgentAsync(Guid agentId, CancellationToken ct = default)
     {
@@ -114,13 +114,24 @@ public class FunctionToolRegistry
         return skills.Select(s =>
         {
             var executor = _executorRegistry.Get(s.Name);
+            var schemaJson = executor?.InputSchemaJson ?? s.InputSchema;
+            JsonElement jsonSchema;
+            try
+            {
+                jsonSchema = JsonSerializer.Deserialize<JsonElement>(schemaJson);
+            }
+            catch
+            {
+                jsonSchema = JsonSerializer.Deserialize<JsonElement>("{\"type\":\"object\"}");
+            }
 
-            return AIFunctionFactory.Create(
-                method: (string arguments, CancellationToken ct2) => ExecuteAsync(s.Name, arguments, ct2),
+            return new FunctionToolAIFunction(
                 name: s.Name,
-                description: executor?.Description ?? s.Description
+                description: executor?.Description ?? s.Description,
+                jsonSchema: jsonSchema,
+                executeAsync: (args, ct2) => ExecuteAsync(s.Name, args, ct2)
             );
-        }).ToList();
+        }).Select(f => (AIFunction)f).ToList();
     }
 
     /// <summary>
@@ -158,4 +169,65 @@ public class FunctionToolRegistry
             };
         }).ToList();
     }
+}
+
+/// <summary>
+/// 自定义 AIFunction 子类，使用技能的正确 InputSchema 作为 JSON Schema，
+/// 确保模型能看到 format/timezone 等具体参数定义，而非单一的 arguments 字符串。
+/// </summary>
+public class FunctionToolAIFunction : AIFunction
+{
+    private readonly string _name;
+    private readonly string _description;
+    private readonly JsonElement _jsonSchema;
+    private readonly Func<string, CancellationToken, Task<string>> _executeAsync;
+    private static readonly MethodInfo ExecuteMethod = typeof(FunctionToolAIFunction).GetMethod(nameof(ExecuteAsync))!;
+
+    public FunctionToolAIFunction(
+        string name,
+        string description,
+        JsonElement jsonSchema,
+        Func<string, CancellationToken, Task<string>> executeAsync)
+    {
+        _name = name;
+        _description = description;
+        _jsonSchema = jsonSchema;
+        _executeAsync = executeAsync;
+    }
+
+    public override string Name => _name;
+    public override string Description => _description;
+    public override JsonElement JsonSchema => _jsonSchema;
+    public override MethodInfo UnderlyingMethod => ExecuteMethod;
+
+    /// <summary>
+    /// 将模型传入的参数（AIFunctionArguments）序列化为 JSON 字符串，
+    /// 然后调用 ExecuteAsync 执行实际函数逻辑。
+    /// </summary>
+    protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken = default)
+    {
+        // 将 AIFunctionArguments（字典形式）序列化为 JSON 字符串
+        string argsJson;
+        if (arguments is { Count: > 0 })
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var key in arguments.Keys)
+            {
+                dict[key] = arguments[key];
+            }
+            argsJson = JsonSerializer.Serialize(dict);
+        }
+        else
+        {
+            argsJson = "{}";
+        }
+
+        var result = await _executeAsync(argsJson, cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// 用于反射的占位方法（UnderlyingMethod 指向此方法）
+    /// </summary>
+    public Task<string> ExecuteAsync(string arguments, CancellationToken ct) => _executeAsync(arguments, ct);
 }
