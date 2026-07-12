@@ -46,15 +46,29 @@ public class SkillsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<SkillDto>>> Create([FromBody] CreateSkillRequest request, CancellationToken ct)
     {
-        var s = await _service.CreateAsync(request, ct);
-        return CreatedAtAction(nameof(GetById), new { id = s.Id }, new ApiResponse<SkillDto>(true, "Created", s));
+        try
+        {
+            var s = await _service.CreateAsync(request, ct);
+            return CreatedAtAction(nameof(GetById), new { id = s.Id }, new ApiResponse<SkillDto>(true, "Created", s));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiResponse<SkillDto>(false, ex.Message, null));
+        }
     }
 
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<SkillDto>>> Update(Guid id, [FromBody] UpdateSkillRequest request, CancellationToken ct)
     {
-        var s = await _service.UpdateAsync(id, request, ct);
-        return Ok(new ApiResponse<SkillDto>(true, "Updated", s));
+        try
+        {
+            var s = await _service.UpdateAsync(id, request, ct);
+            return Ok(new ApiResponse<SkillDto>(true, "Updated", s));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiResponse<SkillDto>(false, ex.Message, null));
+        }
     }
 
     /// <summary>上传技能包（multipart/form-data .zip）</summary>
@@ -68,9 +82,16 @@ public class SkillsController : ControllerBase
         if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new ApiResponse<SkillUploadResponse>(false, "仅支持 .zip 格式的技能包", null));
 
-        using var stream = file.OpenReadStream();
-        var result = await _service.UploadAsync(stream, file.FileName, ct);
-        return Ok(new ApiResponse<SkillUploadResponse>(true, "上传成功", result));
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var result = await _service.UploadAsync(stream, file.FileName, ct);
+            return Ok(new ApiResponse<SkillUploadResponse>(true, "上传成功", result));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiResponse<SkillUploadResponse>(false, ex.Message, null));
+        }
     }
 
     /// <summary>查看技能包内文件列表</summary>

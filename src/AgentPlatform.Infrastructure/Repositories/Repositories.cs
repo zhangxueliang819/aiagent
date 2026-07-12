@@ -120,6 +120,14 @@ public class SkillRepository : ISkillRepository
     public async Task<List<Skill>> GetByIdsAsync(List<Guid> ids, CancellationToken ct = default)
         => await _db.Skills.Where(s => ids.Contains(s.Id)).ToListAsync(ct);
 
+    public async Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null, CancellationToken ct = default)
+    {
+        var query = _db.Skills.Where(s => s.Name == name);
+        if (excludeId.HasValue)
+            query = query.Where(s => s.Id != excludeId.Value);
+        return await query.AnyAsync(ct);
+    }
+
     public async Task<Skill> AddAsync(Skill skill, CancellationToken ct = default)
     {
         _db.Skills.Add(skill);

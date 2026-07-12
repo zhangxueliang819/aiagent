@@ -40,6 +40,10 @@ public class SkillService
 
     public async Task<SkillDto> CreateAsync(CreateSkillRequest request, CancellationToken ct = default)
     {
+        // 验证名称唯一性
+        if (await _repository.ExistsByNameAsync(request.Name, ct: ct))
+            throw new InvalidOperationException($"技能名称「{request.Name}」已存在，请使用其他名称");
+
         var type = Enum.TryParse<SkillType>(request.Type, out var t) ? t : SkillType.FunctionTool;
 
         // 对 FunctionTool 类型验证执行器是否已注册
@@ -76,6 +80,10 @@ public class SkillService
     {
         var skill = await _repository.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException($"Skill {id} not found");
+
+        // 验证名称唯一性（排除自身）
+        if (request.Name is not null && await _repository.ExistsByNameAsync(request.Name, id, ct))
+            throw new InvalidOperationException($"技能名称「{request.Name}」已存在，请使用其他名称");
 
         if (request.Name is not null) skill.Name = request.Name;
         if (request.Description is not null) skill.Description = request.Description;
@@ -171,6 +179,15 @@ public class SkillService
                 skillMdPath = Directory.GetFiles(extractDir, "SKILL.md", SearchOption.AllDirectories).FirstOrDefault();
 
             var (skillName, skillDesc) = ParseSkillMdFrontmatter(skillMdPath, originalFileName);
+
+            // 验证名称唯一性
+            if (await _repository.ExistsByNameAsync(skillName, ct: ct))
+            {
+                // 清理已解压的文件
+                try { if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true); }
+                catch { /* best-effort */ }
+                throw new InvalidOperationException($"技能名称「{skillName}」已存在，请修改 SKILL.md 中的 name 字段后重新上传");
+            }
 
             var skill = new Skill
             {

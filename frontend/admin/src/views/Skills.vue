@@ -322,8 +322,8 @@ function onTypeChange(newType: string) {
 function onExecutorChange(executorName: string) {
   const ex = skillStore.executorTypes.find(e => e.name === executorName)
   if (ex) {
-    if (!form.description) form.description = ex.description
-    if (form.inputSchema === '{}' || !form.inputSchema) form.inputSchema = ex.inputSchema
+    form.description = ex.description
+    form.inputSchema = ex.inputSchema
   }
 }
 
@@ -393,7 +393,7 @@ async function handleSubmit() {
     }
     showDialog.value = false
   } catch {
-    ElMessage.error(isEditing.value ? '更新失败' : '创建失败')
+    // http 拦截器已自动显示服务端错误消息，此处不再重复提示
   } finally { saving.value = false }
 }
 
