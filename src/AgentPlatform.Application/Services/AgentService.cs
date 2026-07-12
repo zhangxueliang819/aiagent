@@ -198,8 +198,8 @@ public class AgentService
             agent.ModelId, agent.ModelEndpointId,
             agent.Temperature, agent.MaxTokens, agent.TopP,
             Status = agent.Status.ToString(),
-            agent.Configurations,
-            agent.Skills
+            Configurations = agent.Configurations.Select(c => new { c.Id, c.Key, c.Value, c.ValueType }),
+            Skills = agent.Skills.Select(s => new { s.Id, s.SkillId, s.Priority, s.IsEnabled })
         });
 
         await _versionRepo.AddAsync(new AgentVersion

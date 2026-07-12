@@ -74,7 +74,7 @@ public class AgentRuntimeFactory
         };
         options.ChatOptions.Instructions = instructions;
         foreach (var t in tools)
-            options.ChatOptions.Tools.Add(t);
+            (options.ChatOptions.Tools ??= []).Add(t);
 
         // 6. 添加 AgentSkillsProvider（处理文件/目录技能的渐进式披露）
         var skillsProvider = _skillProviderFactory.CreateAgentSkillsProvider(entity.Id, _loggerFactory);
@@ -119,7 +119,7 @@ public class AgentRuntimeFactory
         {
             chatOptions.Instructions = BuildEnhancedInstructions(agent, skillConfig);
             foreach (var t in aiTools)
-                chatOptions.Tools.Add(t);
+                (chatOptions.Tools ??= []).Add(t);
         }
 
         return new AgentRuntimeContext
@@ -186,7 +186,7 @@ public class AgentRuntimeFactory
         var options = _modelProviderFactory.BuildChatOptions(agent) ?? new Microsoft.Extensions.AI.ChatOptions();
         var aiTools = await _functionToolRegistry.GetAIToolsForAgentAsync(agent.Id, ct);
         foreach (var t in aiTools)
-            options.Tools.Add(t);
+            (options.Tools ??= []).Add(t);
 
         // 4. 获取流式响应
         _logger.LogInformation("Starting streaming for {AgentName}", agent.Name);
