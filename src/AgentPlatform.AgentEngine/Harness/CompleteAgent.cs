@@ -1,9 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Middleware;
-using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.AgentEngine.Runtime;
 using AgentPlatform.Core.Entities;
 using Microsoft.Extensions.AI;
@@ -13,20 +11,19 @@ namespace AgentPlatform.AgentEngine.Harness;
 
 /// <summary>
 /// Complete Agent — 基于 MAF ChatClientAgent 的全功能 Agent 封装。
-/// 整合技能集成、中间件管道、上下文压缩和生命周期管理。
+/// 整合技能集成、中间件管道和生命周期管理。
 ///
 /// 设计理念（基于 Microsoft Agent Framework 文档）：
 /// - ChatClientAgent：使用 MAF 内置 Agent Loop（IChatClient + 工具调用）
-/// - 中间件层：通过 MAF 的 .Use() 装饰器模式支持可插拔中间件
+/// - 中间件层：中间件管道提供 Before/After/Error 拦截点
 /// - 技能集成：FunctionTool（AIFunction）+ AgentSkill（AgentSkillsProvider）+ MCP 工具
-/// - 上下文压缩：基于 LLM 摘要的智能压缩 + Token 截断回退
 /// - 生命周期：完整的状态机管理（Draft → Active → Running → Paused → Stopped → Archived）
+/// - 上下文管理：历史消息管理委托给 MAF AIContextProvider
 /// </summary>
 public class CompleteAgent : IAsyncDisposable
 {
     private readonly Microsoft.Agents.AI.ChatClientAgent _innerAgent;
     private readonly MiddlewarePipeline _pipeline;
-    private readonly ContextCompressor? _compressor;
     private readonly ILogger<CompleteAgent> _logger;
     private readonly Agent _entity;
     private CompleteAgentState _state = CompleteAgentState.Draft;
@@ -91,13 +88,11 @@ public class CompleteAgent : IAsyncDisposable
         Agent entity,
         Microsoft.Agents.AI.ChatClientAgent innerAgent,
         MiddlewarePipeline pipeline,
-        ContextCompressor? compressor,
         ILogger<CompleteAgent> logger)
     {
         _entity = entity ?? throw new ArgumentNullException(nameof(entity));
         _innerAgent = innerAgent ?? throw new ArgumentNullException(nameof(innerAgent));
         _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
-        _compressor = compressor;
         _logger = logger;
     }
 
@@ -216,7 +211,8 @@ public class CompleteAgent : IAsyncDisposable
     // ══════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// 执行一次对话（非流式），自动经过中间件管道和上下文压缩
+    /// 执行一次对话（非流式），自动经过中间件管道。
+    /// 注意：历史消息管理由 MAF AIContextProvider 负责，CompleteAgent 不直接操作历史。
     /// </summary>
     public async Task<AgentRunResult> RunAsync(
         string userMessage,
@@ -251,40 +247,27 @@ public class CompleteAgent : IAsyncDisposable
                 };
             }
 
-            // 2. 构建消息列表并应用上下文压缩
+            // 2. 构建消息列表（仅 System + 用户消息，历史由 MAF AIContextProvider 管理）
             var messages = new List<ChatMessage>();
-
-            // System prompt
             if (!string.IsNullOrEmpty(_entity.SystemPrompt))
-            {
                 messages.Add(new ChatMessage(ChatRole.System, _entity.SystemPrompt));
-            }
-
-            // 从 Session 加载历史消息并压缩
-            if (sessionId.HasValue && _compressor is not null)
-            {
-                var historyMessages = await LoadHistoryMessagesAsync(sessionId.Value, ct);
-                var compressed = await _compressor.CompressAsync(historyMessages, ct);
-                messages.AddRange(compressed);
-            }
-
-            // 用户消息
             messages.Add(new ChatMessage(ChatRole.User, userMessage));
 
             // 3. 标记为 Running
             SetRunning();
 
-            // 4. 执行 MAF Agent
+            // 4. 执行 MAF Agent（AIContextProvider 负责历史/上下文管理）
             _logger.LogInformation("CompleteAgent [{Name}] executing run...", Name);
             var response = await _innerAgent.RunAsync(messages, session: null, options: null, ct);
 
             var content = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+            var modelName = string.IsNullOrEmpty(_entity.ModelId) ? _entity.Name : _entity.ModelId;
             var result = new AgentRunResult
             {
                 Content = content,
                 AgentName = Name,
                 SessionId = sessionId,
-                ModelName = response.Messages.LastOrDefault()?.RawRepresentation?.ToString(),
+                ModelName = modelName,
                 InputTokens = (int)(response.Usage?.InputTokenCount ?? 0),
                 OutputTokens = (int)(response.Usage?.OutputTokenCount ?? 0),
                 DurationMs = (DateTime.UtcNow - context.StartedAt).TotalMilliseconds,
@@ -331,7 +314,8 @@ public class CompleteAgent : IAsyncDisposable
     }
 
     /// <summary>
-    /// 执行流式对话，自动经过中间件管道和上下文压缩
+    /// 执行流式对话，自动经过中间件管道。
+    /// 注意：历史消息管理由 MAF AIContextProvider 负责，CompleteAgent 不直接操作历史。
     /// </summary>
     public async IAsyncEnumerable<StreamingDelta> RunStreamingAsync(
         string userMessage,
@@ -360,6 +344,7 @@ public class CompleteAgent : IAsyncDisposable
     /// <summary>
     /// 收集流式增量数据（可包含 try-catch，不含 yield return）
     /// 支持 Thinking（推理内容）、Token（文本增量）、ToolCall（工具调用）和 Done（完成事件）
+    /// 注意：历史消息管理由 MAF AIContextProvider 负责，CompleteAgent 不直接操作历史。
     /// </summary>
     private async Task<List<StreamingDelta>> CollectStreamingDeltasAsync(
         string userMessage, Guid? sessionId, CancellationToken ct)
@@ -387,32 +372,24 @@ public class CompleteAgent : IAsyncDisposable
             return deltas;
         }
 
-        // 2. 构建消息列表
+        // 2. 构建消息列表（仅 System + 用户消息，历史由 MAF AIContextProvider 管理）
         var messages = new List<ChatMessage>();
         if (!string.IsNullOrEmpty(_entity.SystemPrompt))
             messages.Add(new ChatMessage(ChatRole.System, _entity.SystemPrompt));
-
-        if (sessionId.HasValue && _compressor is not null)
-        {
-            var historyMessages = await LoadHistoryMessagesAsync(sessionId.Value, ct);
-            var compressed = await _compressor.CompressAsync(historyMessages, ct);
-            messages.AddRange(compressed);
-        }
-
         messages.Add(new ChatMessage(ChatRole.User, userMessage));
 
         // 3. 标记为 Running
         SetRunning();
 
-		var responseStream1 = _innerAgent.RunAsync(messages, session: null, options: null, ct);
+        // 确定模型名（一次赋值，流式 update 中无 ModelId）
+        var modelName = string.IsNullOrEmpty(_entity.ModelId) ? _entity.Name : _entity.ModelId;
 
-		// 4. 通过 MAF 获取流式响应（含 Agent Loop + Tool Calling）
-		var responseStream = _innerAgent.RunStreamingAsync(messages, session: null, options: null, ct);
+        // 4. 通过 MAF 获取流式响应（含 Agent Loop + Tool Calling）
+        var responseStream = _innerAgent.RunStreamingAsync(messages, session: null, options: null, ct);
 
         string fullContent = "";
         string fullThinking = "";
         int inputTokens = 0, outputTokens = 0;
-        string? modelName = null;
         var toolCalls = new List<ToolCallInfo>();
         var rawAdditionalProps = new Dictionary<string, object?>();
         string? rawResponseId = null;
@@ -480,8 +457,6 @@ public class CompleteAgent : IAsyncDisposable
                 if (usageElem.TryGetProperty("completion_tokens", out var ct2))
                     outputTokens = ct2.GetInt32();
             }
-
-            modelName ??= string.IsNullOrEmpty(_entity.ModelId) ? _entity.Name : _entity.ModelId;
         }
 
         // 5. After 中间件
@@ -583,14 +558,6 @@ public class CompleteAgent : IAsyncDisposable
                     $"Cannot transition from '{_state}' to '{to}'. Expected current state: '{from}'.");
             _state = to;
         }
-    }
-
-    private async Task<List<ChatMessage>> LoadHistoryMessagesAsync(Guid sessionId, CancellationToken ct)
-    {
-        // 从 ISessionRepository 加载历史消息列表
-        // 此处通过 _entity.Skills + 外部仓储获取历史
-        // 实际实现中可通过 ISessionRepository 加载
-        return new List<ChatMessage>();
     }
 
     // ══════════════════════════════════════════════════════════════

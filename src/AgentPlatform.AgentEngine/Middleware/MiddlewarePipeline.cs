@@ -85,13 +85,14 @@ public class MiddlewarePipeline
                 if (!shouldContinue)
                 {
                     _logger.LogInformation("Middleware {Name} interrupted the pipeline", mw.Name);
-                    return null; // 调用方应处理为"请求被拒绝"
+                    return $"Request blocked by middleware: {mw.Name}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Middleware {Name} OnBefore failed", mw.Name);
+                _logger.LogError(ex, "Middleware {Name} OnBefore failed, interrupting pipeline", mw.Name);
                 await mw.OnErrorAsync(context, ex, ct);
+                return $"Middleware error: {mw.Name} - {ex.Message}";
             }
         }
         return null; // 所有中间件通过

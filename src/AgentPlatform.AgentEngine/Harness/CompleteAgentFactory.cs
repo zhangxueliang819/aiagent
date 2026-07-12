@@ -1,4 +1,3 @@
-using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Middleware;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.Application.Services;
@@ -24,7 +23,6 @@ public class CompleteAgentFactory
     private readonly UnifiedSkillProviderFactory _skillProviderFactory;
     private readonly McpSkillProvider _mcpSkillProvider;
     private readonly IAuditLogRepository _auditRepo;
-    private readonly IChatClient _defaultChatClient;
     private readonly ModelRouter _modelRouter;
 
     public CompleteAgentFactory(
@@ -33,7 +31,6 @@ public class CompleteAgentFactory
         UnifiedSkillProviderFactory skillProviderFactory,
         McpSkillProvider mcpSkillProvider,
         IAuditLogRepository auditRepo,
-        IChatClient defaultChatClient,
         ModelRouter modelRouter)
     {
         _loggerFactory = loggerFactory;
@@ -41,21 +38,19 @@ public class CompleteAgentFactory
         _skillProviderFactory = skillProviderFactory;
         _mcpSkillProvider = mcpSkillProvider;
         _auditRepo = auditRepo;
-        _defaultChatClient = defaultChatClient;
         _modelRouter = modelRouter;
     }
 
     /// <summary>
     /// 根据 Agent 配置解析 IChatClient。
-    /// 优先通过 ModelRouter 按 Agent 的 ModelEndpointId 获取真实客户端，
-    /// 回退到 DI 注入的默认客户端（SimulatedModelProvider）。
+    /// 通过 ModelRouter 按 Agent 的 ModelEndpointId 获取真实客户端。
     /// </summary>
     private async Task<IChatClient> ResolveChatClientAsync(Agent entity, CancellationToken ct)
     {
-        var realClient = await _modelRouter.ResolveAsync(entity, ct);
-        if (realClient is not null)
-            return realClient;
-        return _defaultChatClient;
+        var client = await _modelRouter.ResolveAsync(entity, ct);
+        return client ?? throw new InvalidOperationException(
+            $"No IChatClient resolved for agent '{entity.Name}' (Id: {entity.Id}). " +
+            "Ensure the agent has a valid ModelEndpoint configured.");
     }
 
     /// <summary>
@@ -80,12 +75,7 @@ public class CompleteAgentFactory
             // 默认中间件
             .WithLogging()
             .WithRateLimiting(60)
-            .WithAudit(_auditRepo)
-            // 默认上下文压缩（4K Token 预算，Summarize 模式）
-            .WithContextCompression(
-                maxTokens: 4096,
-                strategy: CompressionStrategy.Summarize,
-                summarizerClient: client);
+            .WithAudit(_auditRepo);
 
         return await builder.BuildAsync(ct);
     }

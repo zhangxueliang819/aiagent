@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using AgentPlatform.AgentEngine.Middleware;
+using AgentPlatform.AgentEngine.Harness;
 
 namespace AgentPlatform.AgentEngine.Middleware;
 
@@ -54,12 +54,30 @@ public class InputOutputTransformMiddleware : IAgentMiddleware
 
     public Task OnAfterAsync(AgentMiddlewareContext context, object? response, CancellationToken ct)
     {
-        if (_outputTransform is not null && response is string text)
+        if (_outputTransform is not null)
         {
-            var transformed = _outputTransform(text);
-            context.Properties["TransformedOutput"] = transformed;
-            _logger.LogDebug("[MW-IOTransform] Output transformed: {OrigLen} → {NewLen} chars",
-                text.Length, transformed.Length);
+            // 提取响应文本进行转换
+            var text = response switch
+            {
+                string s => s,
+                AgentRunResult r => r.Content,
+                _ => response?.ToString()
+            };
+
+            if (!string.IsNullOrEmpty(text))
+            {
+                var transformed = _outputTransform(text);
+                context.Properties["TransformedOutput"] = transformed;
+
+                // 如果是 AgentRunResult，更新其 Content
+                if (response is AgentRunResult result)
+                {
+                    result.Content = transformed;
+                }
+
+                _logger.LogDebug("[MW-IOTransform] Output transformed: {OrigLen} → {NewLen} chars",
+                    text.Length, transformed.Length);
+            }
         }
 
         return Task.CompletedTask;

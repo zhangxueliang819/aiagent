@@ -1,36 +1,31 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using AgentPlatform.Core.Entities;
-using AgentPlatform.Core.Interfaces;
 
 namespace AgentPlatform.AgentEngine.Providers;
 
 /// <summary>
-/// 模型提供器工厂（V2.0）：直接创建 MEAI IChatClient，移除 IModelProvider 桥接。
-/// 使用默认 IChatClient 作为回退，ModelEndpoint 配置的 Agent 可通过 ModelRouter 获取真实客户端。
+/// 模型提供器工厂（V2.0）：构建 MAF ChatOptions。
+/// IChatClient 的解析由 ModelRouter 通过 ModelEndpointId 完成。
 /// </summary>
 public class ModelProviderFactory
 {
-    private readonly IChatClient _defaultChatClient;
     private readonly ILogger<ModelProviderFactory> _logger;
 
-    public ModelProviderFactory(IChatClient defaultChatClient, ILogger<ModelProviderFactory> logger)
+    public ModelProviderFactory(ILogger<ModelProviderFactory> logger)
     {
-        _defaultChatClient = defaultChatClient;
         _logger = logger;
     }
 
     /// <summary>
-    /// 根据 Agent 实体创建 IChatClient（MAF 标准接口）。
-    /// V2.0: 直接返回默认 IChatClient（SimulatedModelProvider 或真实 OpenAI）。
+    /// 此方法已弃用 — IChatClient 的解析应通过 ModelRouter 完成。
     /// </summary>
+    [Obsolete("Use ModelRouter to resolve IChatClient per agent.")]
     public Task<IChatClient> CreateChatClientAsync(Agent agent, ModelEndpoint? endpoint = null)
     {
-        _logger.LogInformation(
-            "Creating MAF IChatClient for agent {AgentName} (model: {ModelId})",
-            agent.Name, agent.ModelId);
-
-        return Task.FromResult(_defaultChatClient);
+        throw new NotSupportedException(
+            "IChatClient resolution via ModelProviderFactory is no longer supported. " +
+            "Use CompleteAgentFactory or ModelRouter to resolve per-agent clients.");
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Middleware;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.Core.Entities;
@@ -18,7 +17,6 @@ namespace AgentPlatform.AgentEngine.Harness;
 ///     .WithFunctionTools(functionToolRegistry)
 ///     .WithAgentSkills(skillProviderFactory)
 ///     .WithMiddleware(new LoggingMiddleware(logger))
-///     .WithContextCompression(chatClient, maxTokens: 4096)
 ///     .Build();
 /// </code>
 ///
@@ -26,7 +24,7 @@ namespace AgentPlatform.AgentEngine.Harness;
 /// - 步骤 1：创建代理并获取响应
 /// - 步骤 2：添加工具
 /// - 步骤 3：多轮次对话
-/// - 步骤 4：内存和持久性
+/// - 步骤 4：内存和持久性（通过 AIContextProvider）
 /// </summary>
 public class CompleteAgentBuilder
 {
@@ -37,7 +35,6 @@ public class CompleteAgentBuilder
     private FunctionToolRegistry? _functionToolRegistry;
     private UnifiedSkillProviderFactory? _skillProviderFactory;
     private McpSkillProvider? _mcpSkillProvider;
-    private ContextCompressorOptions? _compressionOptions;
     private Microsoft.Agents.AI.ChatClientAgentOptions? _agentOptions;
     private Microsoft.Agents.AI.AgentSkillsProvider? _skillsProvider;
 
@@ -168,30 +165,6 @@ public class CompleteAgentBuilder
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  上下文压缩
-    // ══════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// 启用上下文压缩
-    /// </summary>
-    /// <param name="maxTokens">最大 Token 预算（默认 4096）</param>
-    /// <param name="strategy">压缩策略（默认 Summarize）</param>
-    /// <param name="summarizerClient">用于摘要的 IChatClient（默认使用主客户端）</param>
-    public CompleteAgentBuilder WithContextCompression(
-        int maxTokens = 4096,
-        CompressionStrategy strategy = CompressionStrategy.Summarize,
-        IChatClient? summarizerClient = null)
-    {
-        _compressionOptions = new ContextCompressorOptions
-        {
-            MaxTokens = maxTokens,
-            Strategy = strategy,
-            SummarizerClient = summarizerClient
-        };
-        return this;
-    }
-
-    // ══════════════════════════════════════════════════════════════
     //  构建
     // ══════════════════════════════════════════════════════════════
 
@@ -210,19 +183,7 @@ public class CompleteAgentBuilder
         // 1. 构建中间件管道
         var pipeline = new MiddlewarePipeline(_middlewares, _loggerFactory.CreateLogger<MiddlewarePipeline>());
 
-        // 2. 构建上下文压缩器
-        ContextCompressor? compressor = null;
-        if (_compressionOptions is not null)
-        {
-            var summarizer = _compressionOptions.SummarizerClient ?? _chatClient;
-            compressor = new ContextCompressor(
-                summarizer,
-                _compressionOptions.MaxTokens,
-                _compressionOptions.Strategy,
-                _loggerFactory.CreateLogger<ContextCompressor>());
-        }
-
-        // 3. 构建 ChatClientAgentOptions
+        // 2. 构建 ChatClientAgentOptions
         var options = _agentOptions ?? new Microsoft.Agents.AI.ChatClientAgentOptions
         {
             Name = _entity.Name,
@@ -237,7 +198,7 @@ public class CompleteAgentBuilder
             AIContextProviders = []
         };
 
-        // 4. 添加 FunctionTool 工具
+        // 3. 添加 FunctionTool 工具
         if (_functionToolRegistry is not null)
         {
             var aiFunctions = await _functionToolRegistry.GetAIFunctionsForAgentAsync(_entity.Id, ct);
@@ -252,7 +213,7 @@ public class CompleteAgentBuilder
                 aiFunctions.Count, _entity.Name);
         }
 
-        // 5. 添加 MCP 工具
+        // 4. 添加 MCP 工具
         if (_mcpSkillProvider is not null)
         {
             var mcpTools = await _mcpSkillProvider.GetAIToolsForAgentAsync(_entity.Id, ct);
@@ -267,7 +228,7 @@ public class CompleteAgentBuilder
                 mcpTools.Count, _entity.Name);
         }
 
-        // 6. 添加 AgentSkillsProvider
+        // 5. 添加 AgentSkillsProvider
         if (_skillsProvider is not null)
         {
             options.AIContextProviders = [.. options.AIContextProviders ?? [], _skillsProvider];
@@ -287,7 +248,7 @@ public class CompleteAgentBuilder
             }
         }
 
-        // 7. 创建 MAF ChatClientAgent
+        // 6. 创建 MAF ChatClientAgent
         var innerAgent = new Microsoft.Agents.AI.ChatClientAgent(
             chatClient: _chatClient,
             options: options,
@@ -298,10 +259,9 @@ public class CompleteAgentBuilder
             _entity,
             innerAgent,
             pipeline,
-            compressor,
             logger);
 
-        // 8. 触发初始化事件（通过内部方法）
+        // 7. 触发初始化事件（通过内部方法）
         await completeAgent.NotifyInitializedAsync();
 
         logger.LogInformation("CompleteAgent [{Name}] built successfully with {MiddlewareCount} middlewares",
@@ -318,12 +278,4 @@ public class CompleteAgentBuilder
     {
         return Task.Run(() => BuildAsync()).GetAwaiter().GetResult();
     }
-}
-
-/// <summary>上下文压缩器选项</summary>
-internal class ContextCompressorOptions
-{
-    public int MaxTokens { get; set; } = 4096;
-    public CompressionStrategy Strategy { get; set; } = CompressionStrategy.Summarize;
-    public IChatClient? SummarizerClient { get; set; }
 }

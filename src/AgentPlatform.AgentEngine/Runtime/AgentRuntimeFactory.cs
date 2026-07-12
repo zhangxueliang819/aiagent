@@ -412,17 +412,11 @@ public class AgentRuntimeFactory
     /// </summary>
     private async Task<IChatClient> ResolveChatClientAsync(Agent agent, CancellationToken ct)
     {
-        // 尝试从 ModelRouter 获取真实 LLM 客户端
-        var realClient = await _modelRouter.ResolveAsync(agent, ct);
-        if (realClient is not null)
-        {
-            _logger.LogInformation("Using real LLM client for agent {AgentName}", agent.Name);
-            return realClient;
-        }
-
-        // 回退到默认（模拟）客户端
-        _logger.LogInformation("Agent {AgentName} has no model endpoint, using default (simulated) client", agent.Name);
-        return await _modelProviderFactory.CreateChatClientAsync(agent);
+        // 从 ModelRouter 获取真实 LLM 客户端
+        var client = await _modelRouter.ResolveAsync(agent, ct);
+        return client ?? throw new InvalidOperationException(
+            $"No IChatClient resolved for agent '{agent.Name}' (Id: {agent.Id}). " +
+            "Ensure the agent has a valid ModelEndpoint configured.");
     }
 
     /// <summary>

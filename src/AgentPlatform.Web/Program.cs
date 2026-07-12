@@ -13,7 +13,6 @@ using AgentPlatform.AgentEngine.Skills.Implementations;
 using AgentPlatform.AgentEngine.Telemetry;
 using AgentPlatform.AgentEngine.Services;
 using AgentPlatform.AgentEngine.Harness;
-using AgentPlatform.ModelProviders.Simulated;
 using AgentPlatform.Web.Controllers;
 using AgentPlatform.Web.Hubs;
 using AgentPlatform.Web.Middleware;
@@ -103,7 +102,6 @@ try
     // Agent Engine - Harness CompleteAgent (新增) — Scoped：依赖 EF Core 仓储
     builder.Services.AddScoped<McpToolClientFactory>();
     builder.Services.AddScoped<McpSkillProvider>();
-    builder.Services.AddScoped<ContextCompressor>();
 
     // Agent Engine - Telemetry (MAF Phase 5) — Singleton：纯 OpenTelemetry 封装，无 Scoped 依赖
     builder.Services.AddSingleton<AgentTelemetry>();
@@ -115,10 +113,6 @@ try
 
     // HTTP Client factory (used by ModelProviderService, ModelRouter)
     builder.Services.AddHttpClient();
-
-    // Simulated LLM (dev fallback when Agent has no ModelEndpoint configured)
-    builder.Services.AddSingleton<SimulatedModelProvider>();
-    builder.Services.AddSingleton<Microsoft.Extensions.AI.IChatClient>(sp => sp.GetRequiredService<SimulatedModelProvider>());
 
     // 注册 CompleteAgent 工厂（通过 CompleteAgentBuilder 创建）
     builder.Services.AddScoped<CompleteAgentFactory>();
