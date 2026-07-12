@@ -81,7 +81,30 @@ public class SkillService
         if (request.Description is not null) skill.Description = request.Description;
         if (request.Type is not null)
             skill.Type = Enum.TryParse<SkillType>(request.Type, out var t) ? t : SkillType.FunctionTool;
-        if (request.Implementation is not null) skill.Implementation = request.Implementation;
+        if (request.Implementation is not null)
+        {
+            // AgentSkill 的 File/Directory 类型：写入磁盘文件，不更新 DB 字段
+            if (skill.Type == SkillType.AgentSkill &&
+                (skill.StorageType == SkillStorageType.File || skill.StorageType == SkillStorageType.Directory) &&
+                !string.IsNullOrEmpty(skill.StoragePath) &&
+                Directory.Exists(skill.StoragePath))
+            {
+                var skillMdPath = Path.Combine(skill.StoragePath, "SKILL.md");
+                try
+                {
+                    File.WriteAllText(skillMdPath, request.Implementation);
+                    _logger.LogInformation("AgentSkill {Id} implementation written to {Path}", skill.Id, skillMdPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write AgentSkill {Id} implementation to {Path}", skill.Id, skillMdPath);
+                }
+            }
+            else
+            {
+                skill.Implementation = request.Implementation;
+            }
+        }
         if (request.InputSchema is not null) skill.InputSchema = request.InputSchema;
         if (request.IsEnabled.HasValue) skill.IsEnabled = request.IsEnabled.Value;
         skill.UpdatedAt = DateTime.UtcNow;
@@ -284,11 +307,42 @@ public class SkillService
         return true;
     }
 
-    private static SkillDto Map(Skill s) => new(
-        s.Id, s.Name, s.Description, s.Type.ToString(),
-        s.Implementation, s.InputSchema, s.IsEnabled,
-        s.StorageType.ToString(), s.StoragePath, s.OriginalFileName, s.FileManifest,
-        s.CreatedAt, s.UpdatedAt);
+    private static SkillDto Map(Skill s)
+    {
+        var resolvedImpl = ResolveImplementationContent(s);
+        return new(
+            s.Id, s.Name, s.Description, s.Type.ToString(),
+            resolvedImpl, s.InputSchema, s.IsEnabled,
+            s.StorageType.ToString(), s.StoragePath, s.OriginalFileName, s.FileManifest,
+            s.CreatedAt, s.UpdatedAt);
+    }
+
+    /// <summary>
+    /// 解析技能实现内容：AgentSkill 的 File/Directory 类型从磁盘文件实时读取，
+    /// 其他类型直接返回数据库存储值。
+    /// </summary>
+    private static string ResolveImplementationContent(Skill skill)
+    {
+        if (skill.Type == SkillType.AgentSkill &&
+            (skill.StorageType == SkillStorageType.File || skill.StorageType == SkillStorageType.Directory) &&
+            !string.IsNullOrEmpty(skill.StoragePath) &&
+            Directory.Exists(skill.StoragePath))
+        {
+            var skillMdPath = Directory.GetFiles(skill.StoragePath, "SKILL.md", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            if (skillMdPath is not null)
+            {
+                try
+                {
+                    return File.ReadAllText(skillMdPath);
+                }
+                catch (Exception)
+                {
+                    // 文件读取失败时回退到 DB 值
+                }
+            }
+        }
+        return skill.Implementation;
+    }
 
     // ---- helpers ----
 

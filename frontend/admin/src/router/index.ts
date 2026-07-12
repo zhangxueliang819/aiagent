@@ -22,8 +22,6 @@ const router = createRouter({
         { path: 'chat', component: () => import('../views/Chat.vue'), meta: { title: '对话测试' } },
         { path: 'sessions', component: () => import('../views/Sessions.vue'), meta: { title: '会话记录' } },
         { path: 'usage', component: () => import('../views/Usage.vue'), meta: { title: '用量统计' } },
-        { path: 'mcps', component: () => import('../views/McpEndpoints.vue'), meta: { title: 'MCP 管理' } },
-        { path: 'mcps/:id', component: () => import('../views/McpEndpointDetail.vue'), meta: { title: 'MCP 详情' } },
       ]
     }
   ]

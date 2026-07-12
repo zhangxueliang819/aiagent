@@ -10,12 +10,9 @@ public class AgentPlatformDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<AgentConfiguration> AgentConfigurations => Set<AgentConfiguration>();
     public DbSet<AgentSkill> AgentSkills => Set<AgentSkill>();
-    public DbSet<AgentMcpEndpoint> AgentMcpEndpoints => Set<AgentMcpEndpoint>();
     public DbSet<ModelProvider> ModelProviders => Set<ModelProvider>();
     public DbSet<ModelEndpoint> ModelEndpoints => Set<ModelEndpoint>();
     public DbSet<Skill> Skills => Set<Skill>();
-    public DbSet<McpEndpoint> McpEndpoints => Set<McpEndpoint>();
-    public DbSet<McpTool> McpTools => Set<McpTool>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
@@ -33,7 +30,6 @@ public class AgentPlatformDbContext : DbContext
             e.HasOne(x => x.ModelEndpoint).WithMany().HasForeignKey(x => x.ModelEndpointId).IsRequired(false);
             e.HasMany(x => x.Configurations).WithOne(x => x.Agent).HasForeignKey(x => x.AgentId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Skills).WithOne(x => x.Agent).HasForeignKey(x => x.AgentId).OnDelete(DeleteBehavior.Cascade);
-            e.HasMany(x => x.McpEndpoints).WithOne(x => x.Agent).HasForeignKey(x => x.AgentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AgentConfiguration>(e =>
@@ -59,25 +55,6 @@ public class AgentPlatformDbContext : DbContext
         });
 
         modelBuilder.Entity<Skill>(e =>
-        {
-            e.HasKey(x => x.Id);
-        });
-
-        modelBuilder.Entity<McpEndpoint>(e =>
-        {
-            e.HasKey(x => x.Id);
-            e.HasMany(x => x.Tools).WithOne(x => x.McpEndpoint).HasForeignKey(x => x.McpEndpointId).OnDelete(DeleteBehavior.Cascade);
-            e.HasMany(x => x.AgentMcpEndpoints).WithOne(x => x.McpEndpoint).HasForeignKey(x => x.McpEndpointId).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<AgentMcpEndpoint>(e =>
-        {
-            e.HasKey(x => x.Id);
-            e.HasOne(x => x.Agent).WithMany(x => x.McpEndpoints).HasForeignKey(x => x.AgentId);
-            e.HasOne(x => x.McpEndpoint).WithMany(x => x.AgentMcpEndpoints).HasForeignKey(x => x.McpEndpointId);
-        });
-
-        modelBuilder.Entity<McpTool>(e =>
         {
             e.HasKey(x => x.Id);
         });

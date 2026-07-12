@@ -19,13 +19,11 @@ public class AgentContextProvider
     /// </summary>
     /// <param name="agent">Agent 实体</param>
     /// <param name="skillConfig">技能配置</param>
-    /// <param name="mcpTools">MCP 工具列表</param>
     /// <param name="dynamicContext">动态上下文（如用户信息、时间等）</param>
     /// <returns>完整的 System Prompt 字符串</returns>
     public string BuildSystemMessage(
         Agent agent,
         AgentSkillConfiguration skillConfig,
-        List<McpTool> mcpTools,
         Dictionary<string, string>? dynamicContext = null)
     {
         var sb = new System.Text.StringBuilder();
@@ -63,7 +61,7 @@ public class AgentContextProvider
         }
 
         // 4. Function 工具定义
-        if (skillConfig.ToolDefinitions.Count > 0 || mcpTools.Count > 0)
+        if (skillConfig.ToolDefinitions.Count > 0)
         {
             sb.AppendLine("---");
             sb.AppendLine("你有以下可调用的函数。如需调用，请返回 JSON 格式：");
@@ -73,20 +71,6 @@ public class AgentContextProvider
             foreach (var toolDef in skillConfig.ToolDefinitions)
             {
                 sb.AppendLine(JsonSerializer.Serialize(toolDef));
-            }
-
-            foreach (var tool in mcpTools.Where(t => t.IsEnabled))
-            {
-                sb.AppendLine(JsonSerializer.Serialize(new
-                {
-                    type = "function",
-                    function = new
-                    {
-                        name = tool.ToolName,
-                        description = tool.Description,
-                        parameters = TryParseJson(tool.InputSchema)
-                    }
-                }));
             }
 
             sb.AppendLine();
@@ -100,25 +84,9 @@ public class AgentContextProvider
     /// <summary>
     /// 构建简化的 Tool Definitions（用于 Chat API 的 tools 参数，非 Prompt 内联）
     /// </summary>
-    public List<object> BuildToolDefinitions(AgentSkillConfiguration skillConfig, List<McpTool> mcpTools)
+    public List<object> BuildToolDefinitions(AgentSkillConfiguration skillConfig)
     {
-        var tools = new List<object>(skillConfig.ToolDefinitions);
-
-        foreach (var tool in mcpTools.Where(t => t.IsEnabled))
-        {
-            tools.Add(new Dictionary<string, object?>
-            {
-                ["type"] = "function",
-                ["function"] = new Dictionary<string, object?>
-                {
-                    ["name"] = tool.ToolName,
-                    ["description"] = tool.Description,
-                    ["parameters"] = TryParseJson(tool.InputSchema)
-                }
-            });
-        }
-
-        return tools;
+        return new List<object>(skillConfig.ToolDefinitions);
     }
 
     private static object TryParseJson(string json)

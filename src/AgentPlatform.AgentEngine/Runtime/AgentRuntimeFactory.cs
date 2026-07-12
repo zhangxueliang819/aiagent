@@ -4,7 +4,6 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using AgentPlatform.AgentEngine.Providers;
 using AgentPlatform.AgentEngine.Skills;
-using AgentPlatform.AgentEngine.Mcp;
 using AgentPlatform.Application.Services;
 using AgentPlatform.Core.Entities;
 using AgentPlatform.Core.Interfaces;
@@ -24,7 +23,6 @@ public class AgentRuntimeFactory
     private readonly FunctionToolRegistry _functionToolRegistry;
     private readonly UnifiedSkillProviderFactory _skillProviderFactory;
     private readonly ISessionRepository _sessionRepo;
-    private readonly McpToolBridge? _mcpToolBridge;
 
     public AgentRuntimeFactory(
         ILogger<AgentRuntimeFactory> logger,
@@ -33,8 +31,7 @@ public class AgentRuntimeFactory
         ModelRouter modelRouter,
         FunctionToolRegistry functionToolRegistry,
         UnifiedSkillProviderFactory skillProviderFactory,
-        ISessionRepository sessionRepo,
-        McpToolBridge? mcpToolBridge = null)
+        ISessionRepository sessionRepo)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
@@ -43,7 +40,6 @@ public class AgentRuntimeFactory
         _functionToolRegistry = functionToolRegistry;
         _skillProviderFactory = skillProviderFactory;
         _sessionRepo = sessionRepo;
-        _mcpToolBridge = mcpToolBridge;
     }
 
     /// <summary>

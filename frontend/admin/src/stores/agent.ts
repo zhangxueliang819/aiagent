@@ -30,14 +30,6 @@ export interface AgentSkillBinding {
   isEnabled: boolean
 }
 
-export interface AgentMcpBinding {
-  bindingId: string
-  targetId: string
-  targetName: string
-  priority: number
-  isEnabled: boolean
-}
-
 export const useAgentStore = defineStore('agent', () => {
   const agents = ref<Agent[]>([])
   const current = ref<Agent | null>(null)
@@ -95,24 +87,7 @@ export const useAgentStore = defineStore('agent', () => {
     await http.delete(`/agents/${agentId}/bindings/skills/${bindingId}`)
   }
 
-  // === MCP Bindings ===
-
-  async function fetchMcpEndpoints(agentId: string) {
-    const res = await http.get<{ data: AgentMcpBinding[] }>(`/agents/${agentId}/bindings/mcp`)
-    return res.data.data
-  }
-
-  async function bindMcp(agentId: string, mcpId: string, priority: number) {
-    const res = await http.post<{ data: AgentMcpBinding }>(`/agents/${agentId}/bindings/mcp`, { targetId: mcpId, priority })
-    return res.data.data
-  }
-
-  async function unbindMcp(agentId: string, bindingId: string) {
-    await http.delete(`/agents/${agentId}/bindings/mcp/${bindingId}`)
-  }
-
   return { agents, current, loading, activeAgents,
     fetchAll, fetchById, create, update, remove,
-    fetchSkills, bindSkill, unbindSkill,
-    fetchMcpEndpoints, bindMcp, unbindMcp }
+    fetchSkills, bindSkill, unbindSkill }
 })

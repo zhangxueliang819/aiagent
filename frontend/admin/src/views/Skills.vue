@@ -59,9 +59,9 @@
     <el-dialog v-model="showDialog" :title="isEditing ? '编辑技能' : '创建技能'" width="640px">
       <el-form :model="form" label-width="100px">
         <el-form-item label="名称" required><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="2" :disabled="isEditing && form.type === 'AgentSkill'" /></el-form-item>
         <el-form-item label="类型">
-          <el-select v-model="form.type" @change="onTypeChange">
+          <el-select v-model="form.type" @change="onTypeChange" :disabled="isEditing">
             <el-option label="FunctionTool - 函数工具" value="FunctionTool" />
             <el-option label="AgentSkill - 知识技能" value="AgentSkill" />
             <el-option label="McpTool - MCP 工具" value="McpTool" />
@@ -69,8 +69,16 @@
         </el-form-item>
         <el-form-item label="实现">
           <template v-if="form.type === 'AgentSkill'">
-            <el-input v-model="form.implementation" type="textarea" :rows="8" :placeholder="implPlaceholder" />
-            <div style="font-size:12px;color:#909399;margin-top:4px">{{ implHint }}</div>
+            <el-input v-model="form.implementation" type="textarea" :rows="8" disabled
+              :placeholder="implPlaceholder" />
+            <div style="font-size:12px;color:#909399;margin-top:4px">
+              <template v-if="isEditing && (editingStorageType === 'File' || editingStorageType === 'Directory')">
+                📁 内容来自磁盘文件 <strong>SKILL.md</strong>，只读展示。如需修改请使用「查看文件」功能编辑 SKILL.md
+              </template>
+              <template v-else>
+                {{ implHint }}
+              </template>
+            </div>
           </template>
           <template v-else-if="form.type === 'FunctionTool'">
             <el-select v-model="form.implementation" filterable placeholder="选择已注册的执行器" style="width:100%"
@@ -261,6 +269,7 @@ function fileIcon(path: string) {
 const showDialog = ref(false)
 const isEditing = ref(false)
 const editingId = ref('')
+const editingStorageType = ref('')
 const saving = ref(false)
 
 const defaultForm = {
@@ -340,6 +349,7 @@ function openDialog(skill?: Skill) {
   if (skill) {
     isEditing.value = true
     editingId.value = skill.id
+    editingStorageType.value = skill.storageType
     Object.assign(form, {
       name: skill.name, description: skill.description,
       type: skill.type,
@@ -350,6 +360,7 @@ function openDialog(skill?: Skill) {
   } else {
     isEditing.value = false
     editingId.value = ''
+    editingStorageType.value = ''
     Object.assign(form, { ...defaultForm })
   }
   showDialog.value = true

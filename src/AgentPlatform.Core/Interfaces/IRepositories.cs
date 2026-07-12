@@ -54,29 +54,6 @@ public interface IUsageRepository
     Task<List<UsageRecord>> GetAllAsync(DateTime from, DateTime to, CancellationToken ct = default);
 }
 
-public interface IMcpEndpointRepository
-{
-    Task<List<McpEndpoint>> GetAllAsync(CancellationToken ct = default);
-    Task<McpEndpoint?> GetByIdWithToolsAsync(Guid id, CancellationToken ct = default);
-    Task<McpEndpoint> AddAsync(McpEndpoint endpoint, CancellationToken ct = default);
-    Task<McpEndpoint> UpdateAsync(McpEndpoint endpoint, CancellationToken ct = default);
-    Task DeleteAsync(Guid id, CancellationToken ct = default);
-}
-
-public interface IMcpToolRepository
-{
-    Task<List<McpTool>> GetByEndpointIdAsync(Guid endpointId, CancellationToken ct = default);
-    Task AddRangeAsync(List<McpTool> tools, CancellationToken ct = default);
-    Task ClearByEndpointIdAsync(Guid endpointId, CancellationToken ct = default);
-}
-
-public interface IAgentMcpEndpointRepository
-{
-    Task<List<AgentMcpEndpoint>> GetByAgentIdAsync(Guid agentId, CancellationToken ct = default);
-    Task<AgentMcpEndpoint> AddAsync(AgentMcpEndpoint binding, CancellationToken ct = default);
-    Task DeleteAsync(Guid id, CancellationToken ct = default);
-}
-
 public interface IAgentSkillRepository
 {
     Task<List<AgentSkill>> GetByAgentIdAsync(Guid agentId, CancellationToken ct = default);

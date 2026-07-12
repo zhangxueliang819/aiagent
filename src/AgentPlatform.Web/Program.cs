@@ -8,12 +8,10 @@ using AgentPlatform.AgentEngine.Providers;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.AgentEngine.Runtime;
 using AgentPlatform.AgentEngine.Context;
-using AgentPlatform.AgentEngine.Mcp;
 using AgentPlatform.AgentEngine.Middleware;
 using AgentPlatform.AgentEngine.Skills.Implementations;
 using AgentPlatform.AgentEngine.Telemetry;
 using AgentPlatform.AgentEngine.Services;
-using AgentPlatform.ModelProviders.Mcp;
 using AgentPlatform.ModelProviders.Simulated;
 using AgentPlatform.Web.Controllers;
 using AgentPlatform.Web.Hubs;
@@ -46,9 +44,6 @@ try
     builder.Services.AddScoped<ISkillRepository, SkillRepository>();
     builder.Services.AddScoped<ISessionRepository, SessionRepository>();
     builder.Services.AddScoped<IUsageRepository, UsageRepository>();
-    builder.Services.AddScoped<IMcpEndpointRepository, McpEndpointRepository>();
-    builder.Services.AddScoped<IMcpToolRepository, McpToolRepository>();
-    builder.Services.AddScoped<IAgentMcpEndpointRepository, AgentMcpEndpointRepository>();
     builder.Services.AddScoped<IAgentSkillRepository, AgentSkillRepository>();
     builder.Services.AddScoped<IAgentVersionRepository, AgentVersionRepository>();
     builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -92,9 +87,6 @@ try
     // AgentRuntimeFactory 依赖 FunctionToolRegistry/UnifiedSkillProviderFactory → Scoped
     builder.Services.AddScoped<AgentRuntimeFactory>();
 
-    // Agent Engine - MCP Bridge (MAF Phase 2) — Scoped：依赖 IMcpEndpointRepository 等
-    builder.Services.AddScoped<McpToolBridge>();
-
     // Agent Engine - Context & Session (MAF Phase 3)
     builder.Services.AddSingleton<AgentContextProvider>();
     // MafSessionAdapter — Scoped：依赖 ISessionRepository
@@ -115,8 +107,8 @@ try
     builder.Services.AddSingleton<DatabaseSnapshotService>();
     builder.Services.AddHostedService<DatabaseSnapshotService>(sp => sp.GetRequiredService<DatabaseSnapshotService>());
 
-    // MCP Client
-    builder.Services.AddHttpClient<McpClient>();
+    // HTTP Client factory (used by ModelProviderService, ModelRouter)
+    builder.Services.AddHttpClient();
 
     // Simulated LLM (dev fallback when Agent has no ModelEndpoint configured)
     builder.Services.AddSingleton<SimulatedModelProvider>();

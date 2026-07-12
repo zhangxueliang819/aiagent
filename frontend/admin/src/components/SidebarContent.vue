@@ -41,10 +41,6 @@
         <el-icon><TrendCharts /></el-icon>
         <template #title>用量统计</template>
       </el-menu-item>
-      <el-menu-item index="/mcps">
-        <el-icon><Link /></el-icon>
-        <template #title>MCP 管理</template>
-      </el-menu-item>
     </el-menu>
   </div>
 </template>
@@ -53,7 +49,7 @@
 import { useRoute } from 'vue-router'
 import {
   DataAnalysis, Aim, Connection, MagicStick,
-  ChatDotRound, ChatDotSquare, TrendCharts, Link
+  ChatDotRound, ChatDotSquare, TrendCharts
 } from '@element-plus/icons-vue'
 
 defineProps<{ collapsed: boolean }>()

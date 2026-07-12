@@ -175,35 +175,6 @@
           <el-empty v-if="boundSkills.length === 0 && !loadingSkills" description="暂未绑定技能" :image-size="60" />
         </el-tab-pane>
 
-        <!-- MCP 绑定 Tab -->
-        <el-tab-pane label="MCP 绑定" name="mcp">
-          <div style="margin-bottom: 12px; display: flex; gap: 8px">
-            <el-select v-model="selectedMcpId" placeholder="选择 MCP 端点" filterable style="flex:1"
-              :disabled="loadingMcp" :loading="loadingMcp">
-              <el-option
-                v-for="m in availableMcpEndpoints"
-                :key="m.id" :label="`${m.name} (${m.protocol})`" :value="m.id"
-                :disabled="boundMcps.some(b => b.targetId === m.id)" />
-            </el-select>
-            <el-input-number v-model="mcpPriority" :min="0" :max="100" style="width:100px" placeholder="优先级" />
-            <el-button type="primary" @click="handleBindMcp" :loading="bindingMcp" :disabled="!selectedMcpId">绑定</el-button>
-          </div>
-          <el-table :data="boundMcps" size="small" max-height="250">
-            <el-table-column prop="targetName" label="端点名称" />
-            <el-table-column prop="priority" label="优先级" width="80" />
-            <el-table-column prop="isEnabled" label="启用" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.isEnabled ? 'success' : 'info'" size="small">{{ row.isEnabled ? '是' : '否' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" @click="handleUnbindMcp(row.bindingId)">移除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="boundMcps.length === 0 && !loadingMcp" description="暂未绑定 MCP 端点" :image-size="60" />
-        </el-tab-pane>
       </el-tabs>
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
@@ -216,10 +187,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAgentStore, type Agent, type AgentSkillBinding, type AgentMcpBinding } from '../stores/agent'
+import { useAgentStore, type Agent, type AgentSkillBinding } from '../stores/agent'
 import { useSkillStore, type Skill } from '../stores/skill'
 import { useModelStore } from '../stores/model'
-import http from '../api/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Aim } from '@element-plus/icons-vue'
 
@@ -279,14 +249,6 @@ const skillPriority = ref(0)
 const loadingSkills = ref(false)
 const bindingSkill = ref(false)
 
-// MCP binding
-const boundMcps = ref<AgentMcpBinding[]>([])
-const availableMcpEndpoints = ref<{ id: string; name: string; protocol: string }[]>([])
-const selectedMcpId = ref('')
-const mcpPriority = ref(0)
-const loadingMcp = ref(false)
-const bindingMcp = ref(false)
-
 onMounted(() => {
   agentStore.fetchAll()
   skillStore.fetchAll()
@@ -323,7 +285,7 @@ function editAgent(agent: Agent) {
 }
 
 async function onEditDialogOpened() {
-  await Promise.all([loadBoundSkills(), loadBoundMcps()])
+  await loadBoundSkills()
 }
 
 async function loadBoundSkills() {
@@ -333,16 +295,6 @@ async function loadBoundSkills() {
     availableSkills.value = skillStore.skills
   } catch { /* ignore */ }
   finally { loadingSkills.value = false }
-}
-
-async function loadBoundMcps() {
-  loadingMcp.value = true
-  try {
-    boundMcps.value = await agentStore.fetchMcpEndpoints(editingId.value)
-    const res = await http.get<{ data: { id: string; name: string; protocol: string }[] }>('/McpEndpoints')
-    availableMcpEndpoints.value = res.data.data
-  } catch { /* ignore */ }
-  finally { loadingMcp.value = false }
 }
 
 async function handleBindSkill() {
@@ -365,29 +317,6 @@ async function handleUnbindSkill(bindingId: string) {
     await agentStore.unbindSkill(editingId.value, bindingId)
     ElMessage.success('已移除')
     await loadBoundSkills()
-  } catch { /* cancelled */ }
-}
-
-async function handleBindMcp() {
-  if (!selectedMcpId.value) return
-  bindingMcp.value = true
-  try {
-    await agentStore.bindMcp(editingId.value, selectedMcpId.value, mcpPriority.value)
-    ElMessage.success('MCP 绑定成功')
-    selectedMcpId.value = ''
-    mcpPriority.value = 0
-    await loadBoundMcps()
-  } catch {
-    ElMessage.error('绑定失败')
-  } finally { bindingMcp.value = false }
-}
-
-async function handleUnbindMcp(bindingId: string) {
-  try {
-    await ElMessageBox.confirm('确认移除该 MCP 绑定？', '提示', { type: 'warning' })
-    await agentStore.unbindMcp(editingId.value, bindingId)
-    ElMessage.success('已移除')
-    await loadBoundMcps()
   } catch { /* cancelled */ }
 }
 

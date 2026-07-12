@@ -18,12 +18,9 @@ public class DatabaseSnapshot
     public List<Agent>? Agents { get; set; }
     public List<AgentConfiguration>? AgentConfigurations { get; set; }
     public List<AgentSkill>? AgentSkills { get; set; }
-    public List<AgentMcpEndpoint>? AgentMcpEndpoints { get; set; }
     public List<ModelProvider>? ModelProviders { get; set; }
     public List<ModelEndpoint>? ModelEndpoints { get; set; }
     public List<Skill>? Skills { get; set; }
-    public List<McpEndpoint>? McpEndpoints { get; set; }
-    public List<McpTool>? McpTools { get; set; }
     public List<Session>? Sessions { get; set; }
     public List<Conversation>? Conversations { get; set; }
     public List<UsageRecord>? UsageRecords { get; set; }
@@ -105,12 +102,9 @@ public class DatabaseSnapshotService : BackgroundService
             AddIfAny(snapshot.Agents, db.Agents);
             AddIfAny(snapshot.AgentConfigurations, db.AgentConfigurations);
             AddIfAny(snapshot.AgentSkills, db.AgentSkills);
-            AddIfAny(snapshot.AgentMcpEndpoints, db.AgentMcpEndpoints);
             AddIfAny(snapshot.ModelProviders, db.ModelProviders);
             AddIfAny(snapshot.ModelEndpoints, db.ModelEndpoints);
             AddIfAny(snapshot.Skills, db.Skills);
-            AddIfAny(snapshot.McpEndpoints, db.McpEndpoints);
-            AddIfAny(snapshot.McpTools, db.McpTools);
             AddIfAny(snapshot.Sessions, db.Sessions);
             AddIfAny(snapshot.Conversations, db.Conversations);
             AddIfAny(snapshot.UsageRecords, db.UsageRecords);
@@ -143,12 +137,9 @@ public class DatabaseSnapshotService : BackgroundService
                 Agents = await db.Agents.AsNoTracking().ToListAsync(ct),
                 AgentConfigurations = await db.AgentConfigurations.AsNoTracking().ToListAsync(ct),
                 AgentSkills = await db.AgentSkills.AsNoTracking().ToListAsync(ct),
-                AgentMcpEndpoints = await db.AgentMcpEndpoints.AsNoTracking().ToListAsync(ct),
                 ModelProviders = await db.ModelProviders.AsNoTracking().ToListAsync(ct),
                 ModelEndpoints = await db.ModelEndpoints.AsNoTracking().ToListAsync(ct),
                 Skills = await db.Skills.AsNoTracking().ToListAsync(ct),
-                McpEndpoints = await db.McpEndpoints.AsNoTracking().ToListAsync(ct),
-                McpTools = await db.McpTools.AsNoTracking().ToListAsync(ct),
                 Sessions = await db.Sessions.AsNoTracking().ToListAsync(ct),
                 Conversations = await db.Conversations.AsNoTracking().ToListAsync(ct),
                 UsageRecords = await db.UsageRecords.AsNoTracking().ToListAsync(ct),

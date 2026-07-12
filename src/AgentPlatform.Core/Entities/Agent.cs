@@ -25,7 +25,6 @@ public class Agent
 
     public List<AgentConfiguration> Configurations { get; set; } = new();
     public List<AgentSkill> Skills { get; set; } = new();
-    public List<AgentMcpEndpoint> McpEndpoints { get; set; } = new();
 
     /// <summary>导航属性：关联的模型端点</summary>
     public ModelEndpoint? ModelEndpoint { get; set; }

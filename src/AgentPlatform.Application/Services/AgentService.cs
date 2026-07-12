@@ -199,7 +199,6 @@ public class AgentService
             agent.Temperature, agent.MaxTokens, agent.TopP,
             Status = agent.Status.ToString(),
             agent.Configurations,
-            agent.McpEndpoints,
             agent.Skills
         });
 
