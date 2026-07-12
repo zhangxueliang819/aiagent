@@ -8,6 +8,7 @@ namespace AgentPlatform.AgentEngine.Skills;
 
 /// <summary>
 /// FunctionTool 注册表：将数据库中 Type=FunctionTool 的 Skill 转换为 MAF AIFunction。
+/// 运行时通过 FunctionSkillRegistry 解析实际执行委托，而非模拟执行。
 /// 使用 Microsoft.Extensions.AI.AIFunctionFactory 创建标准 AIFunction 实例，
 /// 注入到 ChatClientAgent 的 ChatOptions.Tools。
 /// </summary>
@@ -15,15 +16,18 @@ public class FunctionToolRegistry
 {
     private readonly ISkillRepository _skillRepo;
     private readonly IAgentSkillRepository _agentSkillRepo;
+    private readonly FunctionSkillRegistry _executorRegistry;
     private readonly ILogger<FunctionToolRegistry> _logger;
 
     public FunctionToolRegistry(
         ISkillRepository skillRepo,
         IAgentSkillRepository agentSkillRepo,
+        FunctionSkillRegistry executorRegistry,
         ILogger<FunctionToolRegistry> logger)
     {
         _skillRepo = skillRepo;
         _agentSkillRepo = agentSkillRepo;
+        _executorRegistry = executorRegistry;
         _logger = logger;
     }
 
@@ -59,107 +63,64 @@ public class FunctionToolRegistry
     }
 
     /// <summary>
-    /// 执行指定的 FunctionTool 技能
-    /// V2.0: 直接基于 Skill.Implementation 执行业务逻辑，不再通过 SkillDispatcher 分派
+    /// 执行指定的 FunctionTool 技能。
+    /// V2.0: 通过 FunctionSkillRegistry 解析已注册的 IFunctionSkill 执行器，
+    /// 若未注册则返回错误提示，不再执行模拟/模板替换。
     /// </summary>
     public async Task<string> ExecuteAsync(string skillName, string arguments, CancellationToken ct = default)
     {
-        _logger.LogInformation("Executing FunctionTool: {SkillName} with args: {Args}",
-            skillName, arguments);
+        _logger.LogInformation("Executing FunctionTool: {SkillName}", skillName);
 
-        // 从数据库加载技能定义以获取 Implementation
+        // 1. 从注册表查找执行器
+        var executor = _executorRegistry.Get(skillName);
+        if (executor is not null)
+        {
+            _logger.LogDebug("Found registered executor for FunctionTool {Name}", skillName);
+            return await executor.ExecuteAsync(arguments, ct);
+        }
+
+        // 2. 尝试从数据库加载 Skill 定义（仅用于日志记录）
         var skills = await _skillRepo.GetAllAsync(ct);
         var skill = skills.FirstOrDefault(s => s.Name == skillName && s.Type == SkillType.FunctionTool);
-
-        if (skill is null)
+        if (skill is not null)
+        {
+            _logger.LogWarning(
+                "FunctionTool {Name} exists in DB but has no registered executor. " +
+                "Register an IFunctionSkill via FunctionSkillRegistry.Register(). " +
+                "Implementation value: {Impl}",
+                skillName, skill.Implementation);
+        }
+        else
         {
             _logger.LogWarning("FunctionTool {Name} not found in database", skillName);
-            return JsonSerializer.Serialize(new { error = $"Skill '{skillName}' not found" });
         }
 
-        var parameters = string.IsNullOrWhiteSpace(arguments)
-            ? new Dictionary<string, object?>()
-            : JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments) ?? new();
-
-        try
+        return JsonSerializer.Serialize(new
         {
-            // 执行技能逻辑（基于 Implementation 字段）
-            var result = await ExecuteSkillImplementationAsync(skill, parameters, ct);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "FunctionTool {Name} execution failed", skillName);
-            return JsonSerializer.Serialize(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// 执行技能实现逻辑
-    /// 根据 Implementation 内容执行（支持简单 JSON 模板和脚本）
-    /// </summary>
-    private static Task<string> ExecuteSkillImplementationAsync(Skill skill, Dictionary<string, object?> parameters, CancellationToken ct)
-    {
-        var impl = skill.Implementation?.Trim() ?? "{}";
-
-        // 尝试解析 Implementation 为 JSON 模板
-        if (impl.StartsWith("{") || impl.StartsWith("["))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(impl);
-                // 将模板中的占位符替换为实际参数值
-                var result = ReplaceTemplatePlaceholders(impl, parameters);
-                return Task.FromResult(result);
-            }
-            catch { /* 非 JSON，按脚本处理 */ }
-        }
-
-        // 对于脚本类型，返回参数回显（实际场景可接入脚本引擎）
-        return Task.FromResult(JsonSerializer.Serialize(new
-        {
-            skill = skill.Name,
-            invoked_with = parameters,
-            message = $"Skill '{skill.Name}' executed with provided arguments"
-        }));
-    }
-
-    /// <summary>
-    /// 替换 JSON 模板中的参数占位符 {{paramName}}
-    /// </summary>
-    private static string ReplaceTemplatePlaceholders(string template, Dictionary<string, object?> parameters)
-    {
-        var result = template;
-        foreach (var (key, value) in parameters)
-        {
-            var placeholder = $"{{{{{key}}}}}";
-            if (result.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
-            {
-                var replacement = value switch
-                {
-                    string s => s,
-                    JsonElement je => je.GetRawText(),
-                    _ => value?.ToString() ?? "null"
-                };
-                result = result.Replace(placeholder, replacement, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-        return result;
+            error = $"FunctionTool '{skillName}' has no registered executor. " +
+                    "请通过代码注册 IFunctionSkill 实现，或在技能管理中选择已注册的执行器。"
+        });
     }
 
     /// <summary>
     /// 将 FunctionTool Skill 列表转换为 MAF AIFunction 列表。
     /// 使用 AIFunctionFactory.Create 自动从委托生成 JSON Schema。
+    /// 若技能名称有对应的已注册执行器，优先使用其描述。
     /// </summary>
     public async Task<List<AIFunction>> GetAIFunctionsForAgentAsync(Guid agentId, CancellationToken ct = default)
     {
         var skills = await GetFunctionToolsForAgentAsync(agentId, ct);
 
-        return skills.Select(s => AIFunctionFactory.Create(
-            method: (string arguments, CancellationToken ct2) => ExecuteAsync(s.Name, arguments, ct2),
-            name: s.Name,
-            description: s.Description
-        )).ToList();
+        return skills.Select(s =>
+        {
+            var executor = _executorRegistry.Get(s.Name);
+
+            return AIFunctionFactory.Create(
+                method: (string arguments, CancellationToken ct2) => ExecuteAsync(s.Name, arguments, ct2),
+                name: s.Name,
+                description: executor?.Description ?? s.Description
+            );
+        }).ToList();
     }
 
     /// <summary>

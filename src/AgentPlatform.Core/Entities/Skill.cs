@@ -38,12 +38,6 @@ public enum SkillType
     AgentSkill = 1,
     /// <summary>MCP 工具：来自 MCP Server 的工具</summary>
     McpTool = 2,
-
-    // 保留旧值以兼容现有数据
-    Tool = 0,
-    Api = 0,
-    Script = 1,
-    Composite = 1
 }
 
 /// <summary>

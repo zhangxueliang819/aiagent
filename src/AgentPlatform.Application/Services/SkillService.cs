@@ -11,14 +11,16 @@ namespace AgentPlatform.Application.Services;
 public class SkillService
 {
     private readonly ISkillRepository _repository;
+    private readonly FunctionSkillRegistry _functionSkillRegistry;
     private readonly ILogger<SkillService> _logger;
 
     /// <summary>上传技能包解压根目录</summary>
     private readonly string _uploadRoot;
 
-    public SkillService(ISkillRepository repository, ILogger<SkillService> logger)
+    public SkillService(ISkillRepository repository, FunctionSkillRegistry functionSkillRegistry, ILogger<SkillService> logger)
     {
         _repository = repository;
+        _functionSkillRegistry = functionSkillRegistry;
         _logger = logger;
         _uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "uploaded-skills");
         Directory.CreateDirectory(_uploadRoot);
@@ -38,6 +40,19 @@ public class SkillService
 
     public async Task<SkillDto> CreateAsync(CreateSkillRequest request, CancellationToken ct = default)
     {
+        var type = Enum.TryParse<SkillType>(request.Type, out var t) ? t : SkillType.FunctionTool;
+
+        // 对 FunctionTool 类型验证执行器是否已注册
+        if (type == SkillType.FunctionTool)
+        {
+            var executor = _functionSkillRegistry.Get(request.Implementation);
+            if (executor is null)
+            {
+                _logger.LogWarning("Creating FunctionTool {Name} with unregistered executor: {Impl}",
+                    request.Name, request.Implementation);
+            }
+        }
+
         var storageType = SkillStorageType.Inline;
         if (!string.IsNullOrEmpty(request.StorageType))
             Enum.TryParse<SkillStorageType>(request.StorageType, true, out storageType);
@@ -47,7 +62,7 @@ public class SkillService
             Id = Guid.NewGuid(),
             Name = request.Name,
             Description = request.Description,
-            Type = Enum.TryParse<SkillType>(request.Type, out var t) ? t : SkillType.FunctionTool,
+            Type = type,
             Implementation = request.Implementation,
             InputSchema = request.InputSchema,
             StorageType = storageType,
@@ -143,7 +158,7 @@ public class SkillService
                 StorageType = SkillStorageType.File,
                 StoragePath = extractDir,
                 OriginalFileName = originalFileName,
-                FileManifest = JsonSerializer.Serialize(fileManifest),
+                FileManifest = JsonSerializer.Serialize(fileManifest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
                 InputSchema = "{}",
                 Implementation = skillMdPath is not null ? await File.ReadAllTextAsync(skillMdPath, ct) : string.Empty,
                 IsEnabled = true,
@@ -214,6 +229,40 @@ public class SkillService
         };
 
         return (File.OpenRead(fullPath), contentType, Path.GetFileName(fullPath));
+    }
+
+    /// <summary>获取技能包内单个文件文本内容</summary>
+    public async Task<(string Content, string FileName)?> GetFileContentTextAsync(Guid skillId, string relativePath)
+    {
+        var dir = Path.Combine(_uploadRoot, skillId.ToString());
+        var fullPath = Path.GetFullPath(Path.Combine(dir, relativePath));
+
+        // 安全检查：确保路径在技能目录内
+        if (!fullPath.StartsWith(Path.GetFullPath(dir) + Path.DirectorySeparatorChar))
+            return null;
+
+        if (!File.Exists(fullPath))
+            return null;
+
+        var content = await File.ReadAllTextAsync(fullPath);
+        return (content, Path.GetFileName(fullPath));
+    }
+
+    /// <summary>更新技能包内单个文件内容</summary>
+    public async Task<bool> UpdateFileContentAsync(Guid skillId, string relativePath, string content)
+    {
+        var dir = Path.Combine(_uploadRoot, skillId.ToString());
+        var fullPath = Path.GetFullPath(Path.Combine(dir, relativePath));
+
+        // 安全检查：确保路径在技能目录内
+        if (!fullPath.StartsWith(Path.GetFullPath(dir) + Path.DirectorySeparatorChar))
+            return false;
+
+        if (!File.Exists(fullPath))
+            return false;
+
+        await File.WriteAllTextAsync(fullPath, content);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)

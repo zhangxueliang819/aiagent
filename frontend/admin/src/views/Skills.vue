@@ -72,15 +72,20 @@
             <el-input v-model="form.implementation" type="textarea" :rows="8" :placeholder="implPlaceholder" />
             <div style="font-size:12px;color:#909399;margin-top:4px">{{ implHint }}</div>
           </template>
+          <template v-else-if="form.type === 'FunctionTool'">
+            <el-select v-model="form.implementation" filterable placeholder="选择已注册的执行器" style="width:100%"
+              @change="onExecutorChange">
+              <el-option v-for="ex in skillStore.executorTypes" :key="ex.name"
+                :label="`${ex.name}${ex.description ? ' — ' + ex.description : ''}`"
+                :value="ex.name" />
+            </el-select>
+            <div style="font-size:12px;color:#909399;margin-top:4px">
+              选择已通过代码注册到 FunctionSkillRegistry 的 C# 执行器。如列表为空，请先在代码中注册 IFunctionSkill 实现。
+            </div>
+          </template>
           <template v-else>
             <el-input v-model="form.implementation" :placeholder="implPlaceholder" />
             <div style="font-size:12px;color:#909399;margin-top:4px">{{ implHint }}</div>
-            <div v-if="implTemplates.length > 0" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
-              <el-button v-for="tpl in implTemplates" :key="tpl.label" size="small" link type="primary"
-                @click="form.implementation = tpl.value">
-                {{ tpl.label }}
-              </el-button>
-            </div>
           </template>
         </el-form-item>
         <el-form-item v-if="form.type !== 'AgentSkill'" label="Schema">
@@ -163,7 +168,7 @@
     </el-dialog>
 
     <!-- 文件列表对话框 -->
-    <el-dialog v-model="showFilesDialog" :title="`文件列表 - ${viewingSkill?.name}`" width="500px">
+    <el-dialog v-model="showFilesDialog" :title="`文件列表 - ${viewingSkill?.name}`" width="550px">
       <div v-if="fileList.length > 0">
         <div v-for="f in fileList" :key="f.path"
           style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #ebeef5">
@@ -171,12 +176,25 @@
             <span>{{ fileIcon(f.path) }}</span>
             <span>{{ f.path }}</span>
           </span>
-          <span style="font-size:12px;color:#909399">{{ formatSize(f.size) }}</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:#909399">{{ formatSize(f.size) }}</span>
+            <el-button size="small" link type="primary" @click="viewFileContent(f.path)">查看</el-button>
+          </span>
         </div>
       </div>
       <div v-else style="text-align:center;color:#909399;padding:24px">
         暂无文件信息
       </div>
+    </el-dialog>
+
+    <!-- 编辑文件对话框 -->
+    <el-dialog v-model="showEditDialog" :title="`编辑文件 - ${editingFileName}`" width="720px" draggable>
+      <el-input v-model="editingContent" type="textarea" :rows="20"
+        style="font-family:'Cascadia Code','Fira Code','JetBrains Mono',Consolas,monospace;font-size:13px" />
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveFileContent" :loading="savingFile">保存</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -184,7 +202,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
-import { useSkillStore, type Skill, type SkillUploadResponse, SkillTypeLabels, StorageTypeLabels } from '../stores/skill'
+import { useSkillStore, type Skill, type SkillUploadResponse, SkillTypeLabels, StorageTypeLabels, type ExecutorType } from '../stores/skill'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadInstance, UploadFile } from 'element-plus'
 
@@ -271,47 +289,37 @@ const schemaTemplates: Record<string, string> = {
 const typeDescriptions: Record<string, {
   placeholder: string
   hint: string
-  templates: { label: string; value: string }[]
 }> = {
   FunctionTool: {
-    placeholder: '输入 Executor 类名，如 WeatherApiExecutor、SendEmailExecutor',
-    hint: 'FunctionTool：LLM 可调用的函数工具，Implementation 为 C# Executor 类名',
-    templates: [
-      { label: '天气查询', value: 'WeatherApiExecutor' },
-      { label: '邮件发送', value: 'SendEmailExecutor' },
-      { label: '数据计算', value: 'CalculateExecutor' },
-    ]
+    placeholder: '',
+    hint: 'FunctionTool：从上方下拉列表选择已注册的 IFunctionSkill 执行器，由 MAF AIFunction 自动调度',
   },
   AgentSkill: {
     placeholder: '输入 Markdown 指令正文（SKILL.md 的 body 部分）…',
-    hint: 'AgentSkill：知识指令包，内容为 Markdown 格式的指令/知识，由 Agent 运行时按需加载',
-    templates: []
+    hint: 'AgentSkill：知识指令包，内容为 Markdown 格式的指令/知识，由 Agent 运行时注入 SystemPrompt',
   },
   McpTool: {
     placeholder: '输入 MCP 工具全限定名，如 mcp://server1/tools/get_weather',
     hint: 'McpTool：来自 MCP Server 的工具标识，运行时由 MAF LocalMcpTools 自动发现',
-    templates: [
-      { label: 'MCP 工具标识示例', value: 'mcp://filesystem/tools/list_directory' },
-    ]
   },
-}
-
-// 兼容旧类型名称
-function normalizeType(type: string): string {
-  const map: Record<string, string> = { Tool: 'FunctionTool', Api: 'FunctionTool', Script: 'AgentSkill', Composite: 'AgentSkill' }
-  return map[type] ?? type
 }
 
 function onTypeChange(newType: string) {
   form.implementation = ''
-  if (newType === 'AgentSkill') {
-    form.inputSchema = '{}'
+  form.inputSchema = newType === 'AgentSkill' ? '{}' : form.inputSchema
+}
+
+/** 选择执行器后自动填充描述和 Schema */
+function onExecutorChange(executorName: string) {
+  const ex = skillStore.executorTypes.find(e => e.name === executorName)
+  if (ex) {
+    if (!form.description) form.description = ex.description
+    if (form.inputSchema === '{}' || !form.inputSchema) form.inputSchema = ex.inputSchema
   }
 }
 
 const implPlaceholder = computed(() => typeDescriptions[form.type]?.placeholder ?? '')
 const implHint = computed(() => typeDescriptions[form.type]?.hint ?? '')
-const implTemplates = computed(() => typeDescriptions[form.type]?.templates ?? [])
 
 const schemaError = computed(() => {
   if (form.type === 'AgentSkill') return ''
@@ -323,7 +331,10 @@ const schemaError = computed(() => {
 
 function applyTemplate(name: string) { form.inputSchema = schemaTemplates[name] }
 
-onMounted(() => skillStore.fetchAll())
+onMounted(() => {
+  skillStore.fetchAll()
+  skillStore.fetchExecutorTypes()
+})
 
 function openDialog(skill?: Skill) {
   if (skill) {
@@ -331,7 +342,7 @@ function openDialog(skill?: Skill) {
     editingId.value = skill.id
     Object.assign(form, {
       name: skill.name, description: skill.description,
-      type: normalizeType(skill.type),
+      type: skill.type,
       implementation: skill.implementation ?? '',
       inputSchema: skill.inputSchema,
       isEnabled: skill.isEnabled
@@ -427,21 +438,62 @@ const fileList = ref<{ path: string; size: number; lastModified: string }[]>([])
 
 async function viewFiles(skill: Skill) {
   viewingSkill.value = skill
-  // 优先使用 fileManifest 字段
   if (skill.fileManifest) {
     try {
-      fileList.value = JSON.parse(skill.fileManifest)
+      // 统一属性名为小写（兼容后端 PascalCase 旧数据）
+      const raw: any[] = JSON.parse(skill.fileManifest)
+      fileList.value = raw.map(f => ({
+        path: f.path ?? f.Path ?? '',
+        size: f.size ?? f.Size ?? 0,
+        lastModified: f.lastModified ?? f.LastModified ?? ''
+      }))
     } catch {
       fileList.value = []
     }
   } else {
     try {
-      fileList.value = await skillStore.getFiles(skill.id)
+      const files = await skillStore.getFiles(skill.id)
+      fileList.value = files
     } catch {
       fileList.value = []
     }
   }
   showFilesDialog.value = true
+}
+
+// 文件内容编辑
+const showEditDialog = ref(false)
+const editingFileName = ref('')
+const editingFilePath = ref('')
+const editingContent = ref('')
+const savingFile = ref(false)
+
+async function viewFileContent(filePath: string) {
+  if (!viewingSkill.value) return
+  editingFileName.value = filePath
+  editingFilePath.value = filePath
+  editingContent.value = ''
+  showEditDialog.value = true
+  try {
+    const result = await skillStore.getFileContent(viewingSkill.value.id, filePath)
+    editingContent.value = result.content
+  } catch {
+    ElMessage.error('加载文件内容失败')
+  }
+}
+
+async function saveFileContent() {
+  if (!viewingSkill.value || !editingFilePath.value) return
+  savingFile.value = true
+  try {
+    await skillStore.updateFileContent(viewingSkill.value.id, editingFilePath.value, editingContent.value)
+    ElMessage.success('保存成功')
+    showEditDialog.value = false
+  } catch {
+    ElMessage.error('保存失败')
+  } finally {
+    savingFile.value = false
+  }
 }
 </script>
 

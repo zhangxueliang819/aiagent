@@ -29,15 +29,18 @@ export interface SkillUploadResponse {
   files: SkillFileItem[]
 }
 
+/** 已注册的 FunctionTool 执行器类型 */
+export interface ExecutorType {
+  name: string
+  description: string
+  inputSchema: string
+}
+
 // 技能类型显示映射
 export const SkillTypeLabels: Record<string, string> = {
   FunctionTool: '函数工具',
   AgentSkill: '知识技能',
   McpTool: 'MCP 工具',
-  Tool: '工具(旧)',
-  Api: 'API(旧)',
-  Script: '脚本(旧)',
-  Composite: '组合(旧)'
 }
 
 // 存储类型显示映射
@@ -50,6 +53,7 @@ export const StorageTypeLabels: Record<string, string> = {
 export const useSkillStore = defineStore('skill', () => {
   const skills = ref<Skill[]>([])
   const loading = ref(false)
+  const executorTypes = ref<ExecutorType[]>([])
 
   async function fetchAll() {
     loading.value = true
@@ -58,6 +62,16 @@ export const useSkillStore = defineStore('skill', () => {
       skills.value = res.data.data
     } finally {
       loading.value = false
+    }
+  }
+
+  /** 获取已注册的 FunctionTool 执行器列表 */
+  async function fetchExecutorTypes() {
+    try {
+      const res = await http.get<{ data: ExecutorType[] }>('/skills/executor-types')
+      executorTypes.value = res.data.data
+    } catch {
+      executorTypes.value = []
     }
   }
 
@@ -95,5 +109,17 @@ export const useSkillStore = defineStore('skill', () => {
     skills.value = skills.value.filter(s => s.id !== id)
   }
 
-  return { skills, loading, fetchAll, create, update, upload, getFiles, remove }
+  /** 获取技能包内单个文件文本内容 */
+  async function getFileContent(skillId: string, filePath: string) {
+    const encoded = encodeURIComponent(filePath)
+    const res = await http.get<{ data: { content: string; fileName: string } }>(`/skills/${skillId}/files/text/${encoded}`)
+    return res.data.data
+  }
+
+  /** 更新技能包内单个文件内容 */
+  async function updateFileContent(skillId: string, filePath: string, content: string) {
+    await http.put(`/skills/${skillId}/files/${encodeURIComponent(filePath)}`, { content })
+  }
+
+  return { skills, loading, executorTypes, fetchAll, fetchExecutorTypes, create, update, upload, getFiles, remove, getFileContent, updateFileContent }
 })

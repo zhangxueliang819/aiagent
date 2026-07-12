@@ -1,5 +1,6 @@
 using AgentPlatform.Application.DTOs;
 using AgentPlatform.Application.Services;
+using AgentPlatform.Core.Entities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AgentPlatform.Web.Controllers;
@@ -9,8 +10,23 @@ namespace AgentPlatform.Web.Controllers;
 public class SkillsController : ControllerBase
 {
     private readonly SkillService _service;
+    private readonly FunctionSkillRegistry _skillRegistry;
 
-    public SkillsController(SkillService service) => _service = service;
+    public SkillsController(SkillService service, FunctionSkillRegistry skillRegistry)
+    {
+        _service = service;
+        _skillRegistry = skillRegistry;
+    }
+
+    /// <summary>获取已注册的 FunctionTool 执行器列表（前端创建/编辑技能时选择）</summary>
+    [HttpGet("executor-types")]
+    public ActionResult<ApiResponse<List<ExecutorTypeDto>>> GetExecutorTypes()
+    {
+        var executors = _skillRegistry.GetAll()
+            .Select(e => new ExecutorTypeDto(e.Name, e.Description, e.InputSchemaJson))
+            .ToList();
+        return Ok(new ApiResponse<List<ExecutorTypeDto>>(true, "OK", executors));
+    }
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<SkillDto>>>> GetAll(CancellationToken ct)
@@ -74,6 +90,30 @@ public class SkillsController : ControllerBase
             return NotFound(new ApiResponse<object>(false, "File not found", null));
 
         return File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+    }
+
+    /// <summary>获取技能包内单个文件文本内容（JSON 格式）</summary>
+    [HttpGet("{id:guid}/files/text/{**filePath}")]
+    public async Task<ActionResult<ApiResponse<SkillFileContentDto>>> GetFileText(Guid id, string filePath)
+    {
+        var result = await _service.GetFileContentTextAsync(id, filePath);
+        if (result is null)
+            return NotFound(new ApiResponse<SkillFileContentDto>(false, "File not found", null));
+
+        return Ok(new ApiResponse<SkillFileContentDto>(true, "OK",
+            new SkillFileContentDto(result.Value.Content, result.Value.FileName)));
+    }
+
+    /// <summary>更新技能包内单个文件内容</summary>
+    [HttpPut("{id:guid}/files/{**filePath}")]
+    public async Task<ActionResult<ApiResponse<object>>> UpdateFile(Guid id, string filePath,
+        [FromBody] UpdateFileContentRequest request)
+    {
+        var success = await _service.UpdateFileContentAsync(id, filePath, request.Content);
+        if (!success)
+            return NotFound(new ApiResponse<object>(false, "File not found", null));
+
+        return Ok(new ApiResponse<object>(true, "Saved", null));
     }
 
     [HttpDelete("{id:guid}")]

@@ -64,6 +64,15 @@ public record SkillFileItem(string Path, long Size, DateTime LastModified);
 /// <summary>上传技能包响应</summary>
 public record SkillUploadResponse(SkillDto Skill, List<SkillFileItem> Files);
 
+/// <summary>已注册的 FunctionTool 执行器类型（前端选择用）</summary>
+public record ExecutorTypeDto(string Name, string Description, string InputSchema);
+
+/// <summary>文件文本内容响应</summary>
+public record SkillFileContentDto(string Content, string FileName);
+
+/// <summary>更新文件内容请求</summary>
+public record UpdateFileContentRequest(string Content);
+
 public record SessionDto(Guid Id, string Title, Guid AgentId, string Status,
     DateTime CreatedAt, List<ConversationDto> Conversations);
 

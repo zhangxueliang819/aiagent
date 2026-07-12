@@ -73,6 +73,7 @@ try
     // Agent Engine - Runtime (V2.0: removed SkillDispatcher, FunctionCallHandler, AgentRuntime)
 
     // Agent Engine - Skills (MAF Phase 0) — Scoped：依赖 ISkillRepository 等 EF Core 仓库
+    builder.Services.AddSingleton<FunctionSkillRegistry>();
     builder.Services.AddScoped<DatabaseSkillSource>();
     builder.Services.AddScoped<FunctionToolRegistry>();
     builder.Services.AddScoped<UnifiedSkillProviderFactory>();
