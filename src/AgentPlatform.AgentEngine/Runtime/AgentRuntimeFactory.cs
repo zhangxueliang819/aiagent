@@ -18,6 +18,7 @@ namespace AgentPlatform.AgentEngine.Runtime;
 public class AgentRuntimeFactory
 {
     private readonly ILogger<AgentRuntimeFactory> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ModelProviderFactory _modelProviderFactory;
     private readonly ModelRouter _modelRouter;
     private readonly FunctionToolRegistry _functionToolRegistry;
@@ -27,6 +28,7 @@ public class AgentRuntimeFactory
 
     public AgentRuntimeFactory(
         ILogger<AgentRuntimeFactory> logger,
+        ILoggerFactory loggerFactory,
         ModelProviderFactory modelProviderFactory,
         ModelRouter modelRouter,
         FunctionToolRegistry functionToolRegistry,
@@ -35,6 +37,7 @@ public class AgentRuntimeFactory
         McpToolBridge? mcpToolBridge = null)
     {
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _modelProviderFactory = modelProviderFactory;
         _modelRouter = modelRouter;
         _functionToolRegistry = functionToolRegistry;
@@ -45,7 +48,7 @@ public class AgentRuntimeFactory
 
     /// <summary>
     /// 为指定 Agent 创建完整的 MAF ChatClientAgent。
-    /// 连接 IChatClient + AIFunction 工具 + ChatOptions。
+    /// 连接 IChatClient + AIFunction 工具 + ChatOptions + AgentSkillsProvider。
     /// </summary>
     public async Task<Microsoft.Agents.AI.ChatClientAgent> CreateChatClientAgentAsync(Agent entity, CancellationToken ct = default)
     {
@@ -54,7 +57,7 @@ public class AgentRuntimeFactory
         // 1. 创建 IChatClient（优先真实端点，回退到模拟）
         var chatClient = await ResolveChatClientAsync(entity, ct);
 
-        // 2. 获取技能配置（用于注入 Instructions）
+        // 2. 获取技能配置
         var skillConfig = await _skillProviderFactory.GetSkillConfigurationAsync(entity.Id, ct);
 
         // 3. 构建 Tools 列表
@@ -62,19 +65,37 @@ public class AgentRuntimeFactory
         var aiTools = await _functionToolRegistry.GetAIToolsForAgentAsync(entity.Id, ct);
         tools.AddRange(aiTools);
 
-        // 4. 构建增强的 System Instructions（包含技能上下文）
+        // 4. 构建增强的 System Instructions（仅包含 Inline AgentSkill + 文件技能宣告）
         var instructions = BuildEnhancedInstructions(entity, skillConfig);
 
-        // 5. 创建 ChatClientAgent
+        // 5. 配置 ChatClientAgentOptions
+        var options = new Microsoft.Agents.AI.ChatClientAgentOptions
+        {
+            Name = entity.Name,
+            Description = entity.Description,
+            ChatOptions = _modelProviderFactory.BuildChatOptions(entity) ?? new ChatOptions(),
+            AIContextProviders = []
+        };
+        options.ChatOptions.Instructions = instructions;
+        foreach (var t in tools)
+            options.ChatOptions.Tools.Add(t);
+
+        // 6. 添加 AgentSkillsProvider（处理文件/目录技能的渐进式披露）
+        var skillsProvider = _skillProviderFactory.CreateAgentSkillsProvider(entity.Id, _loggerFactory);
+        if (skillsProvider is not null)
+        {
+            options.AIContextProviders = [skillsProvider];
+        }
+
+        // 7. 创建 ChatClientAgent
         var agent = new Microsoft.Agents.AI.ChatClientAgent(
             chatClient: chatClient,
-            instructions: instructions,
-            name: entity.Name,
-            description: entity.Description,
-            tools: tools);
+            options: options,
+            loggerFactory: _loggerFactory,
+            services: null);
 
-        _logger.LogInformation("MAF ChatClientAgent created for {AgentName} with {ToolCount} tools",
-            entity.Name, tools.Count);
+        _logger.LogInformation("MAF ChatClientAgent created for {AgentName} with {ToolCount} tools, SkillsProvider={HasProvider}",
+            entity.Name, tools.Count, skillsProvider is not null);
 
         return agent;
     }
@@ -325,33 +346,49 @@ public class AgentRuntimeFactory
 
     /// <summary>
     /// 构建增强的 System Instructions（含技能上下文注入）
+    /// - Inline AgentSkill：全量 Markdown 指令注入 Instructions
+    /// - File/Directory AgentSkill：仅宣告名称 + 描述（渐进式披露由 AgentSkillsProvider 处理）
     /// </summary>
     private static string BuildEnhancedInstructions(Agent agent, AgentSkillConfiguration skillConfig)
     {
-        if (skillConfig.InlineAgentSkills.Count == 0 && skillConfig.FileSkillPaths.Count == 0)
+        var hasInline = skillConfig.InlineAgentSkills.Count > 0;
+        var hasFile = skillConfig.FileAgentSkills.Count > 0;
+        if (!hasInline && !hasFile)
             return agent.SystemPrompt ?? string.Empty;
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(agent.SystemPrompt);
         sb.AppendLine();
-        sb.AppendLine("## 可用知识技能");
 
-        foreach (var skill in skillConfig.InlineAgentSkills)
+        // Inline AgentSkill：全量注入
+        if (hasInline)
         {
-            sb.AppendLine($"### {skill.Name}: {skill.Description}");
-            if (!string.IsNullOrEmpty(skill.Implementation))
+            sb.AppendLine("## 可用知识技能（内联）");
+            foreach (var skill in skillConfig.InlineAgentSkills)
             {
-                var truncated = skill.Implementation.Length > 2000
-                    ? skill.Implementation[..2000] + "\n...(已截断)"
-                    : skill.Implementation;
-                sb.AppendLine(truncated);
+                sb.AppendLine($"### {skill.Name}: {skill.Description}");
+                if (!string.IsNullOrEmpty(skill.Implementation))
+                {
+                    var truncated = skill.Implementation.Length > 2000
+                        ? skill.Implementation[..2000] + "\n...(已截断)"
+                        : skill.Implementation;
+                    sb.AppendLine(truncated);
+                }
+                sb.AppendLine();
             }
-            sb.AppendLine();
         }
 
-        foreach (var path in skillConfig.FileSkillPaths)
+        // File/Directory AgentSkill：仅宣告名称 + 描述（减少 token 消耗）
+        // 完整内容由 MAF AgentSkillsProvider 通过 load_skill 工具按需加载
+        if (hasFile)
         {
-            sb.AppendLine($"- 文件技能路径: {path}");
+            sb.AppendLine("## 可用文件技能（按需加载）");
+            sb.AppendLine("当你的任务与以下技能领域匹配时，使用 `load_skill` 工具加载完整的技能说明：");
+            foreach (var skill in skillConfig.FileAgentSkills)
+            {
+                sb.AppendLine($"- **{skill.Name}**: {skill.Description}");
+            }
+            sb.AppendLine();
         }
 
         return sb.ToString();

@@ -8,10 +8,8 @@ namespace AgentPlatform.AgentEngine.Skills;
 /// <summary>
 /// 统一的技能提供器工厂：混合三种来源的技能
 ///   1. 数据库内联（StorageType=Inline）→ 注入 ChatClientAgent Instructions
-///   2. 文件上传（StorageType=File）→ 由 AIContextProvider 注入文件上下文
-///   3. 目录挂载（StorageType=Directory）
-///
-/// MAF 1.13.0：不再使用 AgentSkillsProvider（SK 概念），改用 Instructions 注入 + FunctionTool。
+///   2. 文件上传（StorageType=File/Directory）→ 通过 MAF AgentSkillsProvider 提供
+///   3. 全局目录挂载技能
 /// </summary>
 public class UnifiedSkillProviderFactory
 {
@@ -52,10 +50,13 @@ public class UnifiedSkillProviderFactory
         // 2. AgentSkill (Inline) → 内联指令技能
         config.InlineAgentSkills = await _dbSkillSource.GetInlineAgentSkillsAsync(agentId, ct);
 
-        // 3. AgentSkill (File/Directory) → 基于文件的技能路径
-        config.FileSkillPaths = await _dbSkillSource.GetFileSkillPathsAsync(agentId, ct);
+        // 3. AgentSkill (File/Directory) → 用于 AgentSkillsProvider 的技能目录
+        config.FileSkillDirectories = await _dbSkillSource.GetFileSkillPathsAsync(agentId, ct);
 
-        // 4. 全局目录挂载技能
+        // 4. 文件/目录技能的元数据（用于流式路径的宣告）
+        config.FileAgentSkills = await _dbSkillSource.GetFileAgentSkillsAsync(agentId, ct);
+
+        // 5. 全局目录挂载技能
         var globalSkillsDir = _config["Skills:GlobalDirectory"] ?? "skills";
         if (Directory.Exists(globalSkillsDir))
         {
@@ -74,15 +75,60 @@ public class UnifiedSkillProviderFactory
             }
         }
 
+        // 合并所有 AgentSkillsProvider 扫描目录
+        config.AllProviderDirectories.AddRange(config.FileSkillDirectories);
+        config.AllProviderDirectories.AddRange(config.GlobalSkillDirectories);
+
         _logger.LogInformation(
-            "Skill configuration for agent {AgentId}: {FunctionTools} tools, {InlineSkills} inline skills, {FilePaths} file paths, {GlobalDirs} global dirs",
+            "Skill configuration for agent {AgentId}: {FunctionTools} tools, {InlineSkills} inline skills, {FileSkillDirs} file skill dirs, {GlobalDirs} global dirs",
             agentId,
             config.FunctionTools.Count,
             config.InlineAgentSkills.Count,
-            config.FileSkillPaths.Count,
+            config.FileSkillDirectories.Count,
             config.GlobalSkillDirectories.Count);
 
         return config;
+    }
+
+    /// <summary>
+    /// 为指定 Agent 创建 MAF AgentSkillsProvider（用于非流式 ChatClientAgent 路径）
+    /// </summary>
+    public Microsoft.Agents.AI.AgentSkillsProvider CreateAgentSkillsProvider(Guid agentId, ILoggerFactory loggerFactory)
+    {
+        // 从缓存或实时查询获取技能目录
+        var config = _dbSkillSource.GetFileSkillPathsAsync(agentId).GetAwaiter().GetResult();
+        var allDirs = new List<string>(config);
+
+        // 全局目录
+        var globalSkillsDir = _config["Skills:GlobalDirectory"] ?? "skills";
+        if (Directory.Exists(globalSkillsDir))
+            allDirs.Add(Path.GetFullPath(globalSkillsDir));
+
+        var extraDirs = _config["Skills:GlobalDirectories"];
+        if (!string.IsNullOrEmpty(extraDirs))
+        {
+            foreach (var dir in extraDirs.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = dir.Trim();
+                if (Directory.Exists(trimmed))
+                    allDirs.Add(Path.GetFullPath(trimmed));
+            }
+        }
+
+        if (allDirs.Count == 0)
+        {
+            _logger.LogDebug("No file skill directories for agent {AgentId}, skipping AgentSkillsProvider", agentId);
+            return null!;
+        }
+
+        _logger.LogInformation("Creating AgentSkillsProvider for agent {AgentId} with {DirCount} directories", agentId, allDirs.Count);
+
+        return new Microsoft.Agents.AI.AgentSkillsProvider(
+            allDirs,
+            scriptRunner: null,
+            fileOptions: null,
+            options: null,
+            loggerFactory: loggerFactory);
     }
 
     /// <summary>
@@ -108,9 +154,15 @@ public class AgentSkillConfiguration
     /// <summary>内联 AgentSkill（数据库中的 Markdown 指令）</summary>
     public List<Skill> InlineAgentSkills { get; set; } = new();
 
-    /// <summary>文件/目录类型的技能存储路径</summary>
-    public List<string> FileSkillPaths { get; set; } = new();
+    /// <summary>文件/目录类型的技能存储路径（用于 AgentSkillsProvider）</summary>
+    public List<string> FileSkillDirectories { get; set; } = new();
+
+    /// <summary>文件/目录类型的技能元数据（用于流式路径的宣告）</summary>
+    public List<Skill> FileAgentSkills { get; set; } = new();
 
     /// <summary>全局挂载的技能目录</summary>
     public List<string> GlobalSkillDirectories { get; set; } = new();
+
+    /// <summary>所有 AgentSkillsProvider 需要扫描的目录（File + 全局）</summary>
+    public List<string> AllProviderDirectories { get; set; } = new();
 }

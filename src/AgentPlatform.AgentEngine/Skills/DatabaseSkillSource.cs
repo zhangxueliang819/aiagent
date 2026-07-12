@@ -95,4 +95,35 @@ public class DatabaseSkillSource
 
         return paths;
     }
+
+    /// <summary>
+    /// 获取 Agent 绑定的 File/Directory 类型技能的元数据列表（含 name/description）
+    /// </summary>
+    public async Task<List<Skill>> GetFileAgentSkillsAsync(Guid agentId, CancellationToken ct = default)
+    {
+        var bindings = await _agentSkillRepo.GetByAgentIdAsync(agentId, ct);
+        var skillIds = bindings
+            .Where(b => b.IsEnabled)
+            .Select(b => b.SkillId)
+            .ToList();
+
+        var skills = new List<Skill>();
+        foreach (var skillId in skillIds)
+        {
+            var skill = await _skillRepo.GetByIdAsync(skillId, ct);
+            if (skill is not null
+                && skill.Type == SkillType.AgentSkill
+                && (skill.StorageType == SkillStorageType.File || skill.StorageType == SkillStorageType.Directory)
+                && skill.IsEnabled)
+            {
+                skills.Add(skill);
+            }
+        }
+
+        _logger.LogInformation(
+            "Found {Count} file/directory agent skills metadata for agent {AgentId}",
+            skills.Count, agentId);
+
+        return skills;
+    }
 }

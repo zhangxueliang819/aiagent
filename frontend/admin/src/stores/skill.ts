@@ -111,14 +111,13 @@ export const useSkillStore = defineStore('skill', () => {
 
   /** 获取技能包内单个文件文本内容 */
   async function getFileContent(skillId: string, filePath: string) {
-    const encoded = encodeURIComponent(filePath)
-    const res = await http.get<{ data: { content: string; fileName: string } }>(`/skills/${skillId}/files/text/${encoded}`)
+    const res = await http.get<{ data: { content: string; fileName: string } }>(`/skills/${skillId}/files/text/${filePath}`)
     return res.data.data
   }
 
   /** 更新技能包内单个文件内容 */
   async function updateFileContent(skillId: string, filePath: string, content: string) {
-    await http.put(`/skills/${skillId}/files/${encodeURIComponent(filePath)}`, { content })
+    await http.put(`/skills/${skillId}/files/${filePath}`, { content })
   }
 
   return { skills, loading, executorTypes, fetchAll, fetchExecutorTypes, create, update, upload, getFiles, remove, getFileContent, updateFileContent }

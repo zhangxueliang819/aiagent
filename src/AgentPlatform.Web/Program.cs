@@ -10,6 +10,7 @@ using AgentPlatform.AgentEngine.Runtime;
 using AgentPlatform.AgentEngine.Context;
 using AgentPlatform.AgentEngine.Mcp;
 using AgentPlatform.AgentEngine.Middleware;
+using AgentPlatform.AgentEngine.Skills.Implementations;
 using AgentPlatform.AgentEngine.Telemetry;
 using AgentPlatform.AgentEngine.Services;
 using AgentPlatform.ModelProviders.Mcp;
@@ -74,6 +75,13 @@ try
 
     // Agent Engine - Skills (MAF Phase 0) — Scoped：依赖 ISkillRepository 等 EF Core 仓库
     builder.Services.AddSingleton<FunctionSkillRegistry>();
+    // 注册 IFunctionSkill 实现：以 IEnumerable<IFunctionSkill> 收集供启动时注入 FunctionSkillRegistry
+    builder.Services.AddSingleton<CurrentTimeSkill>();
+    builder.Services.AddSingleton<TextAnalyzerSkill>();
+    builder.Services.AddSingleton<SimpleCalculatorSkill>();
+    builder.Services.AddSingleton<IFunctionSkill>(sp => sp.GetRequiredService<CurrentTimeSkill>());
+    builder.Services.AddSingleton<IFunctionSkill>(sp => sp.GetRequiredService<TextAnalyzerSkill>());
+    builder.Services.AddSingleton<IFunctionSkill>(sp => sp.GetRequiredService<SimpleCalculatorSkill>());
     builder.Services.AddScoped<DatabaseSkillSource>();
     builder.Services.AddScoped<FunctionToolRegistry>();
     builder.Services.AddScoped<UnifiedSkillProviderFactory>();
@@ -238,6 +246,16 @@ try
     var urls = app.Urls.Any()
         ? string.Join(", ", app.Urls)
         : "http://localhost:5000";
+
+    // 将已注册的 IFunctionSkill 实现注入 FunctionSkillRegistry
+    var registry = app.Services.GetRequiredService<FunctionSkillRegistry>();
+    var skills = app.Services.GetServices<IFunctionSkill>();
+    foreach (var skill in skills)
+    {
+        registry.Register(skill);
+        Log.Information("已注册 FunctionTool 执行器: {Name} - {Description}", skill.Name, skill.Description);
+    }
+
     Log.Information("Agent Platform API 已启动，监听地址: {Urls}", urls);
     Log.Information("Swagger UI: {Url}/swagger", app.Urls.FirstOrDefault() ?? "http://localhost:5000");
     app.Run();
