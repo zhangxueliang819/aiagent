@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -96,40 +97,6 @@ public class AgentRuntimeFactory
         return agent;
     }
 
-    /// <summary>
-    /// 为指定 Agent 创建完整的运行时上下文
-    /// </summary>
-    public async Task<AgentRuntimeContext> CreateContextAsync(Agent agent, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Building runtime context for agent {AgentName} ({AgentId})",
-            agent.Name, agent.Id);
-
-        // 1. 创建 IChatClient（优先真实端点，回退到模拟）
-        var llm = await ResolveChatClientAsync(agent, ct);
-
-        // 2. 获取技能配置
-        var skillConfig = await _skillProviderFactory.GetSkillConfigurationAsync(agent.Id, ct);
-
-        // 3. 构建 AIFunction 工具
-        var aiTools = await _functionToolRegistry.GetAIToolsForAgentAsync(agent.Id, ct);
-
-        // 4. 构建 ChatOptions
-        var chatOptions = _modelProviderFactory.BuildChatOptions(agent);
-        if (chatOptions is not null)
-        {
-            chatOptions.Instructions = BuildEnhancedInstructions(agent, skillConfig);
-            foreach (var t in aiTools)
-                (chatOptions.Tools ??= []).Add(t);
-        }
-
-        return new AgentRuntimeContext
-        {
-            Agent = agent,
-            ChatClient = llm,
-            ChatOptions = chatOptions,
-            SkillConfig = skillConfig
-        };
-    }
 
     /// <summary>
     /// 执行对话 V2.0: 使用 ChatClientAgent 内置 Agent Loop。
@@ -199,8 +166,21 @@ public class AgentRuntimeFactory
         bool streamHadContent = false;
         bool usageReceived = false;
 
+        // 收集所有原始响应元数据
+        var rawAdditionalProps = new Dictionary<string, object?>();
+        string? rawResponseId = null;
+        string? rawFinishReason = null;
+
         await foreach (var update in chatClient.GetStreamingResponseAsync(messages, options, ct))
         {
+            // 收集原始响应属性（逐条合并，后面的覆盖前面的）
+            rawResponseId ??= update.ResponseId;
+            rawFinishReason ??= update.FinishReason?.ToString();
+            if (update.AdditionalProperties is { Count: > 0 })
+            {
+                foreach (var kv in update.AdditionalProperties)
+                    rawAdditionalProps[kv.Key] = kv.Value;
+            }
             // 提取推理/思考内容
             string? thinkingDelta = null;
             if (update.AdditionalProperties?.TryGetValue("reasoning_content", out var r) == true)
@@ -323,7 +303,43 @@ public class AgentRuntimeFactory
             }
         }
 
-        // 5. 发送完成事件（含聚合元信息）
+        // 5. 构建原始响应 JSON（包含模型返回的所有元信息）
+        var rawResponseObj = new Dictionary<string, object?>
+        {
+            ["modelId"] = modelName,
+            ["responseId"] = rawResponseId,
+            ["finishReason"] = rawFinishReason,
+            ["inputTokens"] = inputTokens,
+            ["outputTokens"] = outputTokens,
+            ["text"] = fullContent,
+            ["thinking"] = string.IsNullOrEmpty(fullThinking) ? null : fullThinking
+        };
+        if (toolCalls.Count > 0)
+        {
+            rawResponseObj["toolCalls"] = toolCalls.Select(tc => new
+            {
+                name = tc.Name,
+                arguments = tc.Arguments,
+                result = tc.Result
+            }).ToList();
+        }
+        if (rawAdditionalProps.Count > 0)
+        {
+            // 排除已在顶层暴露的字段，避免重复
+            var filtered = rawAdditionalProps
+                .Where(kv => kv.Key is not ("reasoning_content" or "usage"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (filtered.Count > 0)
+                rawResponseObj["additionalProperties"] = filtered;
+        }
+        var rawResponseJson = JsonSerializer.Serialize(rawResponseObj, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        // 6. 发送完成事件（含聚合元信息）
         yield return new StreamingDelta
         {
             Type = StreamDeltaType.Done,
@@ -333,7 +349,8 @@ public class AgentRuntimeFactory
             ToolCalls = toolCalls,
             ModelName = modelName,
             InputTokens = inputTokens,
-            OutputTokens = outputTokens
+            OutputTokens = outputTokens,
+            RawResponse = rawResponseJson
         };
 
         _logger.LogInformation("Streaming completed for {AgentName}, {Tokens} tokens, {ThinkingLen} thinking chars",
@@ -510,4 +527,5 @@ public class StreamingDelta
     public string? ModelName { get; set; }
     public int InputTokens { get; set; }
     public int OutputTokens { get; set; }
+    public string? RawResponse { get; set; }
 }

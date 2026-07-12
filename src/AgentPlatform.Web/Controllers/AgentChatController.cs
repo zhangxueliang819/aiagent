@@ -183,6 +183,7 @@ public class AgentChatController : ControllerBase
                             modelName = delta.ModelName,
                             inputTokens = delta.InputTokens,
                             outputTokens = delta.OutputTokens,
+                            rawResponse = delta.RawResponse,
                             toolCalls = delta.ToolCalls.Select(tc => new
                             {
                                 name = tc.Name,
