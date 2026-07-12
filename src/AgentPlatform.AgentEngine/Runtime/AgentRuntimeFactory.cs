@@ -7,7 +7,6 @@ using AgentPlatform.AgentEngine.Providers;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.Application.Services;
 using AgentPlatform.Core.Entities;
-using AgentPlatform.Core.Interfaces;
 
 namespace AgentPlatform.AgentEngine.Runtime;
 
@@ -23,7 +22,6 @@ public class AgentRuntimeFactory
     private readonly ModelRouter _modelRouter;
     private readonly FunctionToolRegistry _functionToolRegistry;
     private readonly UnifiedSkillProviderFactory _skillProviderFactory;
-    private readonly ISessionRepository _sessionRepo;
 
     public AgentRuntimeFactory(
         ILogger<AgentRuntimeFactory> logger,
@@ -31,8 +29,7 @@ public class AgentRuntimeFactory
         ModelProviderFactory modelProviderFactory,
         ModelRouter modelRouter,
         FunctionToolRegistry functionToolRegistry,
-        UnifiedSkillProviderFactory skillProviderFactory,
-        ISessionRepository sessionRepo)
+        UnifiedSkillProviderFactory skillProviderFactory)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
@@ -40,98 +37,8 @@ public class AgentRuntimeFactory
         _modelRouter = modelRouter;
         _functionToolRegistry = functionToolRegistry;
         _skillProviderFactory = skillProviderFactory;
-        _sessionRepo = sessionRepo;
     }
 
-    /// <summary>
-    /// 为指定 Agent 创建完整的 MAF ChatClientAgent。
-    /// 连接 IChatClient + AIFunction 工具 + ChatOptions + AgentSkillsProvider。
-    /// </summary>
-    public async Task<Microsoft.Agents.AI.ChatClientAgent> CreateChatClientAgentAsync(Agent entity, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Creating MAF ChatClientAgent for {AgentName} ({AgentId})", entity.Name, entity.Id);
-
-        // 1. 创建 IChatClient（优先真实端点，回退到模拟）
-        var chatClient = await ResolveChatClientAsync(entity, ct);
-
-        // 2. 获取技能配置
-        var skillConfig = await _skillProviderFactory.GetSkillConfigurationAsync(entity.Id, ct);
-
-        // 3. 构建 Tools 列表
-        var tools = new List<AITool>();
-        var aiTools = await _functionToolRegistry.GetAIToolsForAgentAsync(entity.Id, ct);
-        tools.AddRange(aiTools);
-
-        // 4. 构建增强的 System Instructions（仅包含 Inline AgentSkill + 文件技能宣告）
-        var instructions = BuildEnhancedInstructions(entity, skillConfig);
-
-        // 5. 配置 ChatClientAgentOptions
-        var options = new Microsoft.Agents.AI.ChatClientAgentOptions
-        {
-            Name = entity.Name,
-            Description = entity.Description,
-            ChatOptions = _modelProviderFactory.BuildChatOptions(entity) ?? new ChatOptions(),
-            AIContextProviders = []
-        };
-        options.ChatOptions.Instructions = instructions;
-        foreach (var t in tools)
-            (options.ChatOptions.Tools ??= []).Add(t);
-
-        // 6. 添加 AgentSkillsProvider（处理文件/目录技能的渐进式披露）
-        var skillsProvider = _skillProviderFactory.CreateAgentSkillsProvider(entity.Id, _loggerFactory);
-        if (skillsProvider is not null)
-        {
-            options.AIContextProviders = [skillsProvider];
-        }
-
-        // 7. 创建 ChatClientAgent
-        var agent = new Microsoft.Agents.AI.ChatClientAgent(
-            chatClient: chatClient,
-            options: options,
-            loggerFactory: _loggerFactory,
-            services: null);
-
-        _logger.LogInformation("MAF ChatClientAgent created for {AgentName} with {ToolCount} tools, SkillsProvider={HasProvider}",
-            entity.Name, tools.Count, skillsProvider is not null);
-
-        return agent;
-    }
-
-
-    /// <summary>
-    /// 执行对话 V2.0: 使用 ChatClientAgent 内置 Agent Loop。
-    /// </summary>
-    public async Task<AgentResponse> RunAsync(
-        Agent agent,
-        Guid sessionId,
-        string userMessage,
-        CancellationToken ct = default)
-    {
-        // 1. 创建 MAF ChatClientAgent
-        var mafAgent = await CreateChatClientAgentAsync(agent, ct);
-
-        // 2. 构建消息列表
-        var messages = await BuildMessagesAsync(agent, sessionId, userMessage, ct);
-
-        // 3. 调用 ChatClientAgent.RunAsync（MAF 内置 Agent Loop + Tool Calling）
-        _logger.LogInformation("Starting MAF agent run for {AgentName}", agent.Name);
-
-        var response = await mafAgent.RunAsync(messages, session: null, options: null, ct);
-
-        var content = response.Messages.LastOrDefault()?.Text ?? string.Empty;
-
-        _logger.LogInformation("MAF agent run completed for {AgentName}, response length: {Length}",
-            agent.Name, content.Length);
-
-        return new AgentResponse
-        {
-            Content = content,
-            ToolCallCount = 0,
-            ModelName = null,
-            InputTokens = (int)(response.Usage?.InputTokenCount ?? 0),
-            OutputTokens = (int)(response.Usage?.OutputTokenCount ?? 0)
-        };
-    }
 
     /// <summary>
     /// 流式执行对话 V2.0: 使用 IChatClient.GetStreamingResponseAsync 实现真流式输出。
@@ -146,8 +53,11 @@ public class AgentRuntimeFactory
         // 1. 获取 IChatClient（跳过 ChatClientAgent，直接用底层客户端流式）
         var chatClient = await ResolveChatClientAsync(agent, ct);
 
-        // 2. 构建消息列表
-        var messages = await BuildMessagesAsync(agent, sessionId, userMessage, ct);
+        // 2. 构建消息列表（System + 用户消息）
+        var messages = new List<ChatMessage>();
+        if (!string.IsNullOrEmpty(agent.SystemPrompt))
+            messages.Add(new ChatMessage(ChatRole.System, agent.SystemPrompt));
+        messages.Add(new ChatMessage(ChatRole.User, userMessage));
 
         // 3. 构建 ChatOptions（含工具）
         var options = _modelProviderFactory.BuildChatOptions(agent) ?? new Microsoft.Extensions.AI.ChatOptions();
@@ -163,8 +73,6 @@ public class AgentRuntimeFactory
         int inputTokens = 0, outputTokens = 0;
         string? modelName = null;
         var toolCalls = new List<ToolCallInfo>();
-        bool streamHadContent = false;
-        bool usageReceived = false;
 
         // 收集所有原始响应元数据
         var rawAdditionalProps = new Dictionary<string, object?>();
@@ -189,7 +97,6 @@ public class AgentRuntimeFactory
             if (!string.IsNullOrEmpty(thinkingDelta))
             {
                 fullThinking += thinkingDelta;
-                streamHadContent = true;
                 yield return new StreamingDelta { Type = StreamDeltaType.Thinking, Thinking = thinkingDelta };
             }
 
@@ -197,7 +104,6 @@ public class AgentRuntimeFactory
             if (!string.IsNullOrEmpty(update.Text))
             {
                 fullContent += update.Text;
-                streamHadContent = true;
                 yield return new StreamingDelta { Type = StreamDeltaType.Token, Content = update.Text };
             }
 
@@ -209,7 +115,6 @@ public class AgentRuntimeFactory
                     : fc.Arguments?.ToString() ?? "{}";
 
                 toolCalls.Add(new ToolCallInfo { Name = fc.Name, Arguments = args });
-                streamHadContent = true;
                 yield return new StreamingDelta
                 {
                     Type = StreamDeltaType.ToolCall,
@@ -222,7 +127,6 @@ public class AgentRuntimeFactory
             if (update.AdditionalProperties?.TryGetValue("usage", out var usageObj) == true
                 && usageObj is System.Text.Json.JsonElement usageElem)
             {
-                usageReceived = true;
                 if (usageElem.TryGetProperty("prompt_tokens", out var pt))
                     inputTokens = pt.GetInt32();
                 if (usageElem.TryGetProperty("completion_tokens", out var ct2))
@@ -230,77 +134,6 @@ public class AgentRuntimeFactory
             }
 
             modelName ??= update.ModelId;
-        }
-
-        // 降级：流式无产出时回退到非流式调用
-        if (!streamHadContent && toolCalls.Count == 0)
-        {
-            _logger.LogInformation("Streaming produced no content, falling back to non-streaming for {AgentName}", agent.Name);
-
-            var response = await chatClient.GetResponseAsync(messages, options, ct);
-            var text = response.Messages.LastOrDefault()?.Text ?? "";
-
-            // 检查是否有 function call（通过 Contents）
-            foreach (var fc in response.Messages.LastOrDefault()?.Contents.OfType<FunctionCallContent>() ?? [])
-            {
-                var args = fc.Arguments is IDictionary<string, object?> dict
-                    ? System.Text.Json.JsonSerializer.Serialize(dict)
-                    : fc.Arguments?.ToString() ?? "{}";
-                toolCalls.Add(new ToolCallInfo { Name = fc.Name, Arguments = args });
-                yield return new StreamingDelta
-                {
-                    Type = StreamDeltaType.ToolCall,
-                    ToolCallName = fc.Name,
-                    ToolCallArgs = args
-                };
-            }
-
-            // 提取思考过程（DeepSeek-R1 等模型在非流式响应中返回 reasoning_content）
-            if (response.AdditionalProperties?.TryGetValue("thinking", out var thinkObj) == true
-                && thinkObj is string thinkStr && !string.IsNullOrEmpty(thinkStr))
-            {
-                fullThinking = thinkStr;
-                yield return new StreamingDelta { Type = StreamDeltaType.Thinking, Thinking = thinkStr };
-            }
-
-            // 逐字符模拟流式输出（降级模式，添加延迟以支持前端逐字渲染）
-            foreach (var ch in text)
-            {
-                fullContent += ch.ToString();
-                yield return new StreamingDelta { Type = StreamDeltaType.Token, Content = ch.ToString() };
-                // 小延迟让前端有时间逐字渲染（流式效果）
-                await Task.Delay(10, ct);
-            }
-
-            modelName ??= response.ModelId;
-            inputTokens = (int)(response.Usage?.InputTokenCount ?? 0);
-            outputTokens = (int)(response.Usage?.OutputTokenCount ?? 0);
-            usageReceived = true;
-        }
-
-        // 流式未提供 usage 时，尝试非流式回退获取 token 统计和模型名
-        if (!usageReceived && agent.ModelEndpointId.HasValue)
-        {
-            try
-            {
-                _logger.LogInformation(
-                    "Streaming did not provide usage, fallback to non-streaming for usage of {AgentName}",
-                    agent.Name);
-
-                var fallbackResponse = await chatClient.GetResponseAsync(messages, options, ct);
-                if (fallbackResponse?.Usage != null)
-                {
-                    inputTokens = (int)(fallbackResponse.Usage?.InputTokenCount ?? 0);
-                    outputTokens = (int)(fallbackResponse.Usage?.OutputTokenCount ?? 0);
-                }
-                modelName ??= fallbackResponse?.ModelId;
-                usageReceived = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Non-streaming usage fallback also failed for {AgentName}", agent.Name);
-            }
         }
 
         // 5. 构建原始响应 JSON（包含模型返回的所有元信息）
@@ -419,67 +252,6 @@ public class AgentRuntimeFactory
             "Ensure the agent has a valid ModelEndpoint configured.");
     }
 
-    /// <summary>
-    /// 构建对话消息列表（System + 历史 + 新用户消息）
-    /// </summary>
-    private async Task<List<Microsoft.Extensions.AI.ChatMessage>> BuildMessagesAsync(
-        Agent agent, Guid sessionId, string userMessage, CancellationToken ct)
-    {
-        var messages = new List<Microsoft.Extensions.AI.ChatMessage>();
-
-        // System message
-        if (!string.IsNullOrEmpty(agent.SystemPrompt))
-        {
-            messages.Add(new Microsoft.Extensions.AI.ChatMessage(
-                Microsoft.Extensions.AI.ChatRole.System, agent.SystemPrompt));
-        }
-
-        // 历史对话
-        var session = await _sessionRepo.GetByIdAsync(sessionId, ct);
-        var history = session?.Conversations?.ToList() ?? new();
-        foreach (var h in history.OrderBy(c => c.CreatedAt))
-        {
-            var role = h.Role.ToLower() switch
-            {
-                "user" => Microsoft.Extensions.AI.ChatRole.User,
-                "assistant" => Microsoft.Extensions.AI.ChatRole.Assistant,
-                _ => Microsoft.Extensions.AI.ChatRole.User
-            };
-            messages.Add(new Microsoft.Extensions.AI.ChatMessage(role, h.Content));
-        }
-
-        // 用户消息
-        messages.Add(new Microsoft.Extensions.AI.ChatMessage(
-            Microsoft.Extensions.AI.ChatRole.User, userMessage));
-
-        return messages;
-    }
-}
-
-/// <summary>
-/// Agent 运行时的完整上下文
-/// </summary>
-public class AgentRuntimeContext
-{
-    public Agent Agent { get; set; } = null!;
-    public IChatClient ChatClient { get; set; } = null!;
-    public Microsoft.Extensions.AI.ChatOptions? ChatOptions { get; set; }
-    public AgentSkillConfiguration SkillConfig { get; set; } = null!;
-}
-
-/// <summary>
-/// Agent 对话响应（V2.0 精简版）
-/// </summary>
-public class AgentResponse
-{
-    public string Content { get; set; } = string.Empty;
-    public int ToolCallCount { get; set; }
-    public string? Thinking { get; set; }
-    public string? RawResponse { get; set; }
-    public string? ModelName { get; set; }
-    public int InputTokens { get; set; }
-    public int OutputTokens { get; set; }
-    public List<ToolCallInfo> ToolCalls { get; set; } = new();
 }
 
 /// <summary>

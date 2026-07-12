@@ -36,7 +36,6 @@ public class CompleteAgentBuilder
     private UnifiedSkillProviderFactory? _skillProviderFactory;
     private McpSkillProvider? _mcpSkillProvider;
     private Microsoft.Agents.AI.ChatClientAgentOptions? _agentOptions;
-    private Microsoft.Agents.AI.AgentSkillsProvider? _skillsProvider;
 
     public CompleteAgentBuilder(ILoggerFactory loggerFactory)
     {
@@ -68,31 +67,9 @@ public class CompleteAgentBuilder
         return this;
     }
 
-    /// <summary>设置 AgentSkillsProvider（文件/目录技能的渐进式披露）</summary>
-    public CompleteAgentBuilder WithAgentSkillsProvider(Microsoft.Agents.AI.AgentSkillsProvider? provider)
-    {
-        _skillsProvider = provider;
-        return this;
-    }
-
     // ══════════════════════════════════════════════════════════════
     //  中间件
     // ══════════════════════════════════════════════════════════════
-
-    /// <summary>添加中间件</summary>
-    public CompleteAgentBuilder WithMiddleware(IAgentMiddleware middleware)
-    {
-        _middlewares.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
-        return this;
-    }
-
-    /// <summary>批量添加中间件</summary>
-    public CompleteAgentBuilder WithMiddlewares(IEnumerable<IAgentMiddleware> middlewares)
-    {
-        foreach (var mw in middlewares)
-            _middlewares.Add(mw);
-        return this;
-    }
 
     /// <summary>添加日志中间件（默认行为）</summary>
     public CompleteAgentBuilder WithLogging()
@@ -117,25 +94,6 @@ public class CompleteAgentBuilder
         _middlewares.Add(new AuditMiddleware(
             auditRepo,
             _loggerFactory.CreateLogger<AuditMiddleware>()));
-        return this;
-    }
-
-    /// <summary>添加输入输出转换中间件</summary>
-    public CompleteAgentBuilder WithInputTransform(Func<string, string>? inputTransform, Func<string, string>? outputTransform = null)
-    {
-        _middlewares.Add(new InputOutputTransformMiddleware(
-            inputTransform,
-            outputTransform,
-            _loggerFactory.CreateLogger<InputOutputTransformMiddleware>()));
-        return this;
-    }
-
-    /// <summary>添加输入验证中间件</summary>
-    public CompleteAgentBuilder WithValidation(params Func<AgentMiddlewareContext, ValueTask<bool>>[] validators)
-    {
-        _middlewares.Add(new ValidationMiddleware(
-            validators,
-            _loggerFactory.CreateLogger<ValidationMiddleware>()));
         return this;
     }
 
@@ -229,14 +187,7 @@ public class CompleteAgentBuilder
         }
 
         // 5. 添加 AgentSkillsProvider
-        if (_skillsProvider is not null)
-        {
-            options.AIContextProviders = [.. options.AIContextProviders ?? [], _skillsProvider];
-            logger.LogInformation(
-                "Added AgentSkillsProvider for agent [{Name}]",
-                _entity.Name);
-        }
-        else if (_skillProviderFactory is not null)
+        if (_skillProviderFactory is not null)
         {
             var sp = _skillProviderFactory.CreateAgentSkillsProvider(_entity.Id, _loggerFactory);
             if (sp is not null)
@@ -255,27 +206,16 @@ public class CompleteAgentBuilder
             loggerFactory: _loggerFactory,
             services: null);
 
+        // 7. 创建 CompleteAgent
         var completeAgent = new CompleteAgent(
             _entity,
             innerAgent,
             pipeline,
             logger);
 
-        // 7. 触发初始化事件（通过内部方法）
-        await completeAgent.NotifyInitializedAsync();
-
         logger.LogInformation("CompleteAgent [{Name}] built successfully with {MiddlewareCount} middlewares",
             _entity.Name, _middlewares.Count);
 
         return completeAgent;
-    }
-
-    /// <summary>
-    /// 同步构建（内部调用 BuildAsync().GetAwaiter().GetResult()）
-    /// 注意：仅在确定没有死锁风险时使用
-    /// </summary>
-    public CompleteAgent Build()
-    {
-        return Task.Run(() => BuildAsync()).GetAwaiter().GetResult();
     }
 }

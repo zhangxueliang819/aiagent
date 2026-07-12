@@ -142,33 +142,6 @@ public class FunctionToolRegistry
         var functions = await GetAIFunctionsForAgentAsync(agentId, ct);
         return functions.Select(f => (AITool)f).ToList();
     }
-
-    /// <summary>
-    /// 将 FunctionTool Skill 列表转换为 OpenAI 兼容的 Tool 定义（兼容旧接口）
-    /// </summary>
-    public static List<object> BuildToolDefinitions(List<Skill> tools)
-    {
-        return tools.Select(skill =>
-        {
-            var schema = new Dictionary<string, object?>();
-            try
-            {
-                schema = JsonSerializer.Deserialize<Dictionary<string, object?>>(skill.InputSchema) ?? new();
-            }
-            catch { /* 使用空 schema */ }
-
-            return (object)new Dictionary<string, object?>
-            {
-                ["type"] = "function",
-                ["function"] = new Dictionary<string, object?>
-                {
-                    ["name"] = skill.Name,
-                    ["description"] = skill.Description,
-                    ["parameters"] = schema
-                }
-            };
-        }).ToList();
-    }
 }
 
 /// <summary>

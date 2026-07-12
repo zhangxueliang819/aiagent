@@ -45,7 +45,6 @@ public class UnifiedSkillProviderFactory
 
         // 1. FunctionTool 类型 → LLM function calling 工具
         config.FunctionTools = await _functionToolRegistry.GetFunctionToolsForAgentAsync(agentId, ct);
-        config.ToolDefinitions = FunctionToolRegistry.BuildToolDefinitions(config.FunctionTools);
 
         // 2. AgentSkill (Inline) → 内联指令技能
         config.InlineAgentSkills = await _dbSkillSource.GetInlineAgentSkillsAsync(agentId, ct);
@@ -131,13 +130,6 @@ public class UnifiedSkillProviderFactory
             loggerFactory: loggerFactory);
     }
 
-    /// <summary>
-    /// 获取所有可用于绑定的技能列表（管理后台用）
-    /// </summary>
-    public async Task<List<Skill>> GetAllAvailableSkillsAsync(CancellationToken ct = default)
-    {
-        return await _skillRepo.GetAllAsync(ct);
-    }
 }
 
 /// <summary>
@@ -147,9 +139,6 @@ public class AgentSkillConfiguration
 {
     /// <summary>FunctionTool 技能列表（LLM function calling 目标）</summary>
     public List<Skill> FunctionTools { get; set; } = new();
-
-    /// <summary>OpenAI 兼容格式的 Tool Definitions</summary>
-    public List<object> ToolDefinitions { get; set; } = new();
 
     /// <summary>内联 AgentSkill（数据库中的 Markdown 指令）</summary>
     public List<Skill> InlineAgentSkills { get; set; } = new();

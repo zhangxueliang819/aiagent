@@ -79,42 +79,4 @@ public class CompleteAgentFactory
 
         return await builder.BuildAsync(ct);
     }
-
-    /// <summary>
-    /// 创建一个最小配置的 CompleteAgent（仅基础功能）
-    /// </summary>
-    public async Task<CompleteAgent> CreateMinimalAgentAsync(
-        Agent entity,
-        IChatClient? chatClient = null,
-        CancellationToken ct = default)
-    {
-        var client = chatClient ?? await ResolveChatClientAsync(entity, ct);
-
-        var builder = new CompleteAgentBuilder(_loggerFactory)
-            .WithEntity(entity)
-            .WithChatClient(client)
-            .WithLogging();
-
-        return await builder.BuildAsync(ct);
-    }
-
-    /// <summary>
-    /// 使用自定义配置创建 CompleteAgent
-    /// </summary>
-    public async Task<CompleteAgent> CreateCustomAgentAsync(
-        Agent entity,
-        Action<CompleteAgentBuilder> configure,
-        IChatClient? chatClient = null,
-        CancellationToken ct = default)
-    {
-        var client = chatClient ?? await ResolveChatClientAsync(entity, ct);
-
-        var builder = new CompleteAgentBuilder(_loggerFactory)
-            .WithEntity(entity)
-            .WithChatClient(client);
-
-        configure(builder);
-
-        return await builder.BuildAsync(ct);
-    }
 }

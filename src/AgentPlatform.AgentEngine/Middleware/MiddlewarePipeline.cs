@@ -67,7 +67,6 @@ public class MiddlewarePipeline
         _middlewares = middlewares.OrderBy(m => m is LoggingMiddleware ? 0
             : m is RateLimitingMiddleware ? 1
             : m is AuditMiddleware ? 2
-            : m is ToolApprovalMiddleware ? 3
             : 99).ToList();
         _logger = logger;
     }
@@ -260,38 +259,3 @@ public class AuditMiddleware : IAgentMiddleware
     public Task OnErrorAsync(AgentMiddlewareContext context, Exception ex, CancellationToken ct) => Task.CompletedTask;
 }
 
-/// <summary>
-/// 工具审批中间件：对敏感工具调用进行人工审批（Human-in-the-Loop）
-/// </summary>
-public class ToolApprovalMiddleware : IAgentMiddleware
-{
-    private readonly ILogger<ToolApprovalMiddleware> _logger;
-    public string Name => "ToolApproval";
-
-    /// <summary>需要审批的工具名称前缀</summary>
-    public List<string> RequireApprovalPrefixes { get; set; } = new() { "delete_", "admin_", "sudo_" };
-
-    public ToolApprovalMiddleware(ILogger<ToolApprovalMiddleware> logger) => _logger = logger;
-
-    public Task<bool> OnBeforeAsync(AgentMiddlewareContext context, CancellationToken ct)
-    {
-        // 检查用户消息是否涉及敏感操作
-        foreach (var prefix in RequireApprovalPrefixes)
-        {
-            if (context.UserMessage.Contains(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                // 标记为需要审批
-                context.Properties["RequiresApproval"] = true;
-                context.Properties["ApprovalReason"] = $"消息包含敏感操作关键词: {prefix}";
-                _logger.LogWarning("[MW-ToolApproval] Sensitive operation detected: {Prefix}", prefix);
-            }
-        }
-        return Task.FromResult(true);
-    }
-
-    public Task OnAfterAsync(AgentMiddlewareContext context, object? response, CancellationToken ct)
-        => Task.CompletedTask;
-
-    public Task OnErrorAsync(AgentMiddlewareContext context, Exception ex, CancellationToken ct)
-        => Task.CompletedTask;
-}

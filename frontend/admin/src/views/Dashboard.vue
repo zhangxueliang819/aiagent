@@ -131,17 +131,14 @@
 
 <script setup lang="ts">
 import { reactive, ref, onMounted, type Component } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAgentStore } from '../stores/agent'
 import { useModelStore } from '../stores/model'
 import { useSkillStore } from '../stores/skill'
 import http from '../api/http'
-import { Aim } from '@element-plus/icons-vue'
 import {
-  DataAnalysis, Connection, MagicStick, ChatDotSquare
+  Aim, DataAnalysis, Connection, MagicStick, ChatDotSquare
 } from '@element-plus/icons-vue'
 
-const router = useRouter()
 const agentStore = useAgentStore()
 const modelStore = useModelStore()
 const skillStore = useSkillStore()

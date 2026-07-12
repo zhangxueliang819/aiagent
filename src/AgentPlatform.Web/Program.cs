@@ -7,10 +7,8 @@ using AgentPlatform.AgentEngine.Memory;
 using AgentPlatform.AgentEngine.Providers;
 using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.AgentEngine.Runtime;
-using AgentPlatform.AgentEngine.Context;
 using AgentPlatform.AgentEngine.Middleware;
 using AgentPlatform.AgentEngine.Skills.Implementations;
-using AgentPlatform.AgentEngine.Telemetry;
 using AgentPlatform.AgentEngine.Services;
 using AgentPlatform.AgentEngine.Harness;
 using AgentPlatform.Web.Controllers;
@@ -88,23 +86,17 @@ try
     builder.Services.AddScoped<AgentRuntimeFactory>();
 
     // Agent Engine - Context & Session (MAF Phase 3)
-    builder.Services.AddSingleton<AgentContextProvider>();
-    // MafSessionAdapter — Scoped：依赖 ISessionRepository
-    builder.Services.AddScoped<MafSessionAdapter>();
+
 
     // Agent Engine - Middleware Pipeline (MAF Phase 4) — Scoped：AuditMiddleware 依赖 IAuditLogRepository
     builder.Services.AddScoped<IAgentMiddleware, LoggingMiddleware>();
     builder.Services.AddScoped<IAgentMiddleware, RateLimitingMiddleware>();
     builder.Services.AddScoped<IAgentMiddleware, AuditMiddleware>();
-    builder.Services.AddScoped<IAgentMiddleware, ToolApprovalMiddleware>();
     builder.Services.AddScoped<MiddlewarePipeline>();
 
     // Agent Engine - Harness CompleteAgent (新增) — Scoped：依赖 EF Core 仓储
     builder.Services.AddScoped<McpToolClientFactory>();
     builder.Services.AddScoped<McpSkillProvider>();
-
-    // Agent Engine - Telemetry (MAF Phase 5) — Singleton：纯 OpenTelemetry 封装，无 Scoped 依赖
-    builder.Services.AddSingleton<AgentTelemetry>();
 
     // Background Services
     builder.Services.AddHostedService<SessionCleanupService>();

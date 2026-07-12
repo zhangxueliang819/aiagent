@@ -40,39 +40,15 @@ public class CompleteAgent : IAsyncDisposable
     /// <summary>Agent 名称</summary>
     public string Name => _entity.Name;
 
-    /// <summary>底层 MAF ChatClientAgent 实例</summary>
-    public Microsoft.Agents.AI.ChatClientAgent InnerAgent => _innerAgent;
-
     /// <summary>Agent 实体（数据模型）</summary>
     public Agent Entity => _entity;
 
     /// <summary>当前生命周期状态</summary>
     public CompleteAgentState State => _state;
 
-    /// <summary>Agent 是否正在运行</summary>
-    public bool IsRunning => _state == CompleteAgentState.Running;
-
-    /// <summary>Agent 是否可执行（可接收新请求）</summary>
-    public bool CanExecute => _state is CompleteAgentState.Active or CompleteAgentState.Running;
-
     // ══════════════════════════════════════════════════════════════
     //  生命周期事件
     // ══════════════════════════════════════════════════════════════
-
-    /// <summary>Agent 初始化完成后触发</summary>
-    public event Func<CompleteAgent, Task>? OnInitialized;
-
-    /// <summary>Agent 启动（状态切换为 Active）时触发</summary>
-    public event Func<CompleteAgent, Task>? OnStarted;
-
-    /// <summary>Agent 暂停时触发</summary>
-    public event Func<CompleteAgent, Task>? OnPaused;
-
-    /// <summary>Agent 停止时触发</summary>
-    public event Func<CompleteAgent, Task>? OnStopped;
-
-    /// <summary>Agent 归档时触发</summary>
-    public event Func<CompleteAgent, Task>? OnArchived;
 
     /// <summary>Agent 执行出错时触发</summary>
     public event Func<CompleteAgent, Exception, Task>? OnError;
@@ -96,13 +72,6 @@ public class CompleteAgent : IAsyncDisposable
         _logger = logger;
     }
 
-    /// <summary>内部：通知初始化完成</summary>
-    internal async Task NotifyInitializedAsync()
-    {
-        if (OnInitialized is not null)
-            await OnInitialized.Invoke(this);
-    }
-
     // ══════════════════════════════════════════════════════════════
     //  生命周期管理
     // ══════════════════════════════════════════════════════════════
@@ -110,100 +79,24 @@ public class CompleteAgent : IAsyncDisposable
     /// <summary>
     /// 启动 Agent：将状态从 Draft 切换为 Active
     /// </summary>
-    public async Task StartAsync(CancellationToken ct = default)
+    public Task StartAsync(CancellationToken ct = default)
     {
         TransitionState(CompleteAgentState.Draft, CompleteAgentState.Active);
         _logger.LogInformation("CompleteAgent [{Name}] started (Active)", Name);
-
-        if (OnStarted is not null)
-            await OnStarted.Invoke(this);
-    }
-
-    /// <summary>
-    /// 暂停 Agent：从 Running 切换到 Paused
-    /// </summary>
-    public Task PauseAsync(CancellationToken ct = default)
-    {
-        TransitionState(CompleteAgentState.Running, CompleteAgentState.Paused);
-        _logger.LogInformation("CompleteAgent [{Name}] paused", Name);
-
-        if (OnPaused is not null)
-            return OnPaused.Invoke(this);
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// 恢复 Agent：从 Paused 切换到 Running
+    /// 停止 Agent：切换到 Stopped 状态
     /// </summary>
-    public Task ResumeAsync(CancellationToken ct = default)
+    public Task StopAsync(CancellationToken ct = default)
     {
-        TransitionState(CompleteAgentState.Paused, CompleteAgentState.Running);
-        _logger.LogInformation("CompleteAgent [{Name}] resumed (Running)", Name);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 停止 Agent：从任意非终态切换到 Stopped
-    /// </summary>
-    public async Task StopAsync(CancellationToken ct = default)
-    {
-        var allowedFrom = new[] { CompleteAgentState.Active, CompleteAgentState.Running, CompleteAgentState.Paused };
         lock (_stateLock)
         {
-            if (!allowedFrom.Contains(_state))
-                throw new InvalidOperationException(
-                    $"Cannot stop agent from state {_state}. Allowed states: {string.Join(", ", allowedFrom)}");
             _state = CompleteAgentState.Stopped;
         }
         _logger.LogInformation("CompleteAgent [{Name}] stopped", Name);
-
-        if (OnStopped is not null)
-            await OnStopped.Invoke(this);
-    }
-
-    /// <summary>
-    /// 归档 Agent：从任意终态切换到 Archived
-    /// </summary>
-    public async Task ArchiveAsync(CancellationToken ct = default)
-    {
-        TransitionState(CompleteAgentState.Stopped, CompleteAgentState.Archived);
-        _logger.LogInformation("CompleteAgent [{Name}] archived", Name);
-
-        if (OnArchived is not null)
-            await OnArchived.Invoke(this);
-    }
-
-    /// <summary>
-    /// 更新 Agent 实体数据（运行时热更新）
-    /// </summary>
-    public void UpdateEntity(Agent updatedEntity)
-    {
-        // 保持 Id 不变，更新其他属性
-        updatedEntity.Id = _entity.Id;
-        // 复制到 _entity（引用类型，直接赋值即可）
-        _entity.Name = updatedEntity.Name;
-        _entity.Description = updatedEntity.Description;
-        _entity.SystemPrompt = updatedEntity.SystemPrompt;
-        _entity.ModelEndpointId = updatedEntity.ModelEndpointId;
-        _entity.Temperature = updatedEntity.Temperature;
-        _entity.MaxTokens = updatedEntity.MaxTokens;
-        _entity.TopP = updatedEntity.TopP;
-
-        _logger.LogInformation("CompleteAgent [{Name}] entity updated", Name);
-    }
-
-    /// <summary>获取 Agent 当前状态摘要</summary>
-    public AgentStatusSummary GetStatusSummary()
-    {
-        return new AgentStatusSummary
-        {
-            AgentId = Id,
-            Name = Name,
-            State = _state.ToString(),
-            IsRunning = IsRunning,
-            CanExecute = CanExecute,
-            LastActivityAt = DateTime.UtcNow
-        };
+        return Task.CompletedTask;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -532,7 +425,7 @@ public class CompleteAgent : IAsyncDisposable
 
     private void ThrowIfNotExecutable()
     {
-        if (!CanExecute)
+        if (_state is not (CompleteAgentState.Active or CompleteAgentState.Running))
             throw new InvalidOperationException(
                 $"Agent '{Name}' is in state '{_state}' and cannot execute. " +
                 $"Start the agent first via StartAsync().");
@@ -542,8 +435,6 @@ public class CompleteAgent : IAsyncDisposable
     {
         lock (_stateLock)
         {
-            if (_state == CompleteAgentState.Paused)
-                throw new InvalidOperationException($"Agent '{Name}' is paused. Resume it first.");
             if (_state == CompleteAgentState.Active)
                 _state = CompleteAgentState.Running;
         }
@@ -595,12 +486,8 @@ public enum CompleteAgentState
     Active,
     /// <summary>运行中（当前正在处理请求）</summary>
     Running,
-    /// <summary>已暂停（需要 Resume 恢复）</summary>
-    Paused,
-    /// <summary>已停止（不可执行，可归档）</summary>
-    Stopped,
-    /// <summary>已归档（终态）</summary>
-    Archived
+    /// <summary>已停止（不可执行）</summary>
+    Stopped
 }
 
 /// <summary>Agent 运行结果</summary>
@@ -635,15 +522,4 @@ public class AgentRunResult
 
     /// <summary>是否成功</summary>
     public bool IsSuccess => string.IsNullOrEmpty(Error) && !Interrupted;
-}
-
-/// <summary>Agent 状态摘要</summary>
-public class AgentStatusSummary
-{
-    public Guid AgentId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string State { get; set; } = string.Empty;
-    public bool IsRunning { get; set; }
-    public bool CanExecute { get; set; }
-    public DateTime LastActivityAt { get; set; }
 }

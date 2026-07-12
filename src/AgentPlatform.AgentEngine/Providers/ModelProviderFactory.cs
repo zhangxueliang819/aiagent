@@ -18,17 +18,6 @@ public class ModelProviderFactory
     }
 
     /// <summary>
-    /// 此方法已弃用 — IChatClient 的解析应通过 ModelRouter 完成。
-    /// </summary>
-    [Obsolete("Use ModelRouter to resolve IChatClient per agent.")]
-    public Task<IChatClient> CreateChatClientAsync(Agent agent, ModelEndpoint? endpoint = null)
-    {
-        throw new NotSupportedException(
-            "IChatClient resolution via ModelProviderFactory is no longer supported. " +
-            "Use CompleteAgentFactory or ModelRouter to resolve per-agent clients.");
-    }
-
-    /// <summary>
     /// 构建 MAF ChatOptions（使用 Microsoft.Extensions.AI.ChatOptions）
     /// </summary>
     public Microsoft.Extensions.AI.ChatOptions? BuildChatOptions(Agent agent)
