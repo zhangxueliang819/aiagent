@@ -3,6 +3,7 @@ using AgentPlatform.AgentEngine.Skills;
 using AgentPlatform.Core.Entities;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 
 namespace AgentPlatform.AgentEngine.Harness;
 
@@ -122,14 +123,19 @@ public class CompleteAgentBuilder
         return this;
     }
 
-    // ══════════════════════════════════════════════════════════════
-    //  构建
-    // ══════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// 构建 CompleteAgent 实例
-    /// </summary>
-    public async Task<CompleteAgent> BuildAsync(CancellationToken ct = default)
+	[Description("文本分析")]
+	static string GetWeather([Description("文本分析")] string location)
+	=> $"The weather in {location} is cloudy with a high of 15°C.";
+
+	// ══════════════════════════════════════════════════════════════
+	//  构建
+	// ══════════════════════════════════════════════════════════════
+
+	/// <summary>
+	/// 构建 CompleteAgent 实例
+	/// </summary>
+	public async Task<CompleteAgent> BuildAsync(CancellationToken ct = default)
     {
         if (_entity is null)
             throw new InvalidOperationException("Agent entity is required. Call WithEntity() first.");
@@ -166,7 +172,8 @@ public class CompleteAgentBuilder
             {
                 options.ChatOptions.Tools.Add(fn);
             }
-            logger.LogInformation(
+            options.ChatOptions.Tools.Add(AIFunctionFactory.Create(GetWeather));
+			logger.LogInformation(
                 "Added {Count} FunctionTools for agent [{Name}]",
                 aiFunctions.Count, _entity.Name);
         }

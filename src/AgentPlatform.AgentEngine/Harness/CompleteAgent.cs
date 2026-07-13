@@ -277,10 +277,15 @@ public class CompleteAgent : IAsyncDisposable
         // 确定模型名（一次赋值，流式 update 中无 ModelId）
         var modelName = string.IsNullOrEmpty(_entity.ModelId) ? _entity.Name : _entity.ModelId;
 
-        // 4. 通过 MAF 获取流式响应（含 Agent Loop + Tool Calling）
-        var responseStream = _innerAgent.RunStreamingAsync(messages, session: null, options: null, ct);
+		var responseStream1 = _innerAgent.RunAsync(messages, session: null, options: null, ct);
+        await responseStream1;
 
-        string fullContent = "";
+		// 4. 通过 MAF 获取流式响应（含 Agent Loop + Tool Calling）
+		var responseStream = _innerAgent.RunStreamingAsync(messages, session: null, options: null, ct);
+
+
+
+		string fullContent = "";
         string fullThinking = "";
         int inputTokens = 0, outputTokens = 0;
         var toolCalls = new List<ToolCallInfo>();

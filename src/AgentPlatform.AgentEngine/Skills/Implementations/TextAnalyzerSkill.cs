@@ -83,4 +83,5 @@ public class TextAnalyzerSkill : IFunctionSkill
         };
         return Task.FromResult(JsonSerializer.Serialize(result));
     }
+
 }

@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="AgentPlatform.Test/AgentPlatform.Test.csproj" Id="08144820-4c37-4e1a-a9b1-9db270dcc959" />
     <Project Path="src/AgentPlatform.AgentEngine/AgentPlatform.AgentEngine.csproj" />
     <Project Path="src/AgentPlatform.Application/AgentPlatform.Application.csproj" />
     <Project Path="src/AgentPlatform.Billing/AgentPlatform.Billing.csproj" />

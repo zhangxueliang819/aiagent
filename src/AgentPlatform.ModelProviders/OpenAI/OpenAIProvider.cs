@@ -94,6 +94,9 @@ public class OpenAIProvider : IChatClient
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
+        // 累积跨 chunk 的工具调用（按 tool index 分组）
+        var pendingToolCalls = new Dictionary<int, (string? CallId, string? Name, string Arguments)>();
+
         string? line;
         while ((line = await reader.ReadLineAsync(cancellationToken)) is not null && !cancellationToken.IsCancellationRequested)
         {
@@ -126,7 +129,92 @@ public class OpenAIProvider : IChatClient
                 continue;
             }
 
-            var (content, reasoning) = TryExtractDelta(chunkRoot);
+            // 解析 choices[0]
+            if (!chunkRoot.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+                continue;
+            var firstChoice = choices[0];
+
+            // 提取 finish_reason
+            string? finishReason = null;
+            if (firstChoice.TryGetProperty("finish_reason", out var fr) && fr.ValueKind == JsonValueKind.String)
+                finishReason = fr.GetString();
+
+            // 提取 delta
+            if (!firstChoice.TryGetProperty("delta", out var delta))
+                continue;
+
+            // ── 处理工具调用（delta.tool_calls）──────────────────────────
+            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var tc in toolCalls.EnumerateArray())
+                {
+                    if (!tc.TryGetProperty("index", out var idxProp)) continue;
+                    int idx = idxProp.GetInt32();
+
+                    if (!pendingToolCalls.TryGetValue(idx, out var pending))
+                        pending = (null, null, "");
+
+                    if (tc.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
+                        pending.CallId = idProp.GetString();
+
+                    if (tc.TryGetProperty("function", out var func))
+                    {
+                        if (func.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                            pending.Name = nameProp.GetString();
+
+                        if (func.TryGetProperty("arguments", out var argsProp) && argsProp.ValueKind == JsonValueKind.String)
+                            pending.Arguments += argsProp.GetString();
+                    }
+
+                    pendingToolCalls[idx] = pending;
+                }
+            }
+
+            // ── 完成工具调用：finish_reason == "tool_calls" ────────────
+            if (finishReason == "tool_calls" && pendingToolCalls.Count > 0)
+            {
+                foreach (var kv in pendingToolCalls)
+                {
+                    var (callId, name, argsStr) = kv.Value;
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        IDictionary<string, object?>? args = null;
+                        if (!string.IsNullOrEmpty(argsStr))
+                        {
+                            try
+                            {
+                                var elem = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(argsStr);
+                                if (elem.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    var dict = new Dictionary<string, object?>();
+                                    foreach (var prop in elem.EnumerateObject())
+                                        dict[prop.Name] = prop.Value.Clone();
+                                    args = dict;
+                                }
+                            }
+                            catch { }
+                        }
+                        var fcUpdate = new ChatResponseUpdate(ChatRole.Assistant, (string?)null)
+                        {
+                            ModelId = chunkModelId
+                        };
+                        fcUpdate.Contents.Add(new FunctionCallContent(callId ?? "", name, args));
+                        yield return fcUpdate;
+                    }
+                }
+                pendingToolCalls.Clear();
+                continue;
+            }
+
+            // ── 普通文本/推理增量 ─────────────────────────────────────
+            string? content = null;
+            if (delta.TryGetProperty("content", out var contentProp) && contentProp.ValueKind != JsonValueKind.Null)
+                content = contentProp.GetString();
+
+            string? reasoning = null;
+            if (delta.TryGetProperty("reasoning_content", out var reasoningProp) && reasoningProp.ValueKind != JsonValueKind.Null)
+                reasoning = reasoningProp.GetString();
+
             if (content is not null || reasoning is not null)
             {
                 yield return new ChatResponseUpdate(ChatRole.Assistant, content)
@@ -313,32 +401,4 @@ public class OpenAIProvider : IChatClient
         "function" => "tool",
         _ => "user"
     };
-
-    private static (string? Content, string? ReasoningContent) TryExtractDelta(JsonElement root)
-    {
-        try
-        {
-            if (!root.TryGetProperty("choices", out var choices)) return (null, null);
-            if (choices.GetArrayLength() == 0) return (null, null);
-
-            var first = choices[0];
-            if (!first.TryGetProperty("delta", out var delta)) return (null, null);
-
-            string? content = null;
-            if (delta.TryGetProperty("content", out var contentProp)
-                && contentProp.ValueKind != JsonValueKind.Null)
-                content = contentProp.GetString();
-
-            string? reasoning = null;
-            if (delta.TryGetProperty("reasoning_content", out var reasoningProp)
-                && reasoningProp.ValueKind != JsonValueKind.Null)
-                reasoning = reasoningProp.GetString();
-
-            return (content, reasoning);
-        }
-        catch (JsonException)
-        {
-            return (null, null);
-        }
-    }
 }
